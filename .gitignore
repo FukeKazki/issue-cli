@@ -1,0 +1,6 @@
+# Local build output
+/issue
+/issue-cli
+
+# Editor / OS junk
+.DS_Store
