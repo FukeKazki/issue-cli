@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -133,6 +134,9 @@ func editIssue(s *store.Store, id int) error {
 		return err
 	}
 	if err := tui.RunForm(iss, "Edit Issue"); err != nil {
+		if errors.Is(err, tui.ErrCanceled) {
+			return nil
+		}
 		return err
 	}
 	return s.Save(iss)
@@ -145,6 +149,9 @@ func createFromList(s *store.Store) error {
 	}
 	iss := &model.Issue{ID: id, Status: model.StatusTODO}
 	if err := tui.RunForm(iss, "Create Issue"); err != nil {
+		if errors.Is(err, tui.ErrCanceled) {
+			return nil
+		}
 		return err
 	}
 	if strings.TrimSpace(iss.Title) == "" {
