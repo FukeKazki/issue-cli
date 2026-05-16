@@ -1,7 +1,7 @@
 # issue-cli
 
 Local-only issue manager. Stores issues as YAML under `.issues/` in the repo,
-lists them through `fzf`, and switches Git branches by id.
+browses them through a built-in TUI, and switches Git branches by id.
 
 The repository is `issue-cli` but the installed binary is named `issue`.
 
@@ -17,7 +17,7 @@ Or via mise:
 mise use -g go:github.com/FukeKazki/issue-cli/cmd/issue@latest
 ```
 
-Requires `fzf` and `git` on `PATH`.
+Requires `git` on `PATH`.
 
 ## Usage
 
@@ -36,18 +36,22 @@ other branch, exits with an error and prints usage.
 
 ### `issue list`
 
-Opens `fzf` with open issues (TODO / In Progress / Reviews).
+Opens the built-in TUI with open issues (TODO / In Progress / Reviews).
+Left pane is the list, right pane shows the detail preview.
 
-| Key       | Action                                |
-| --------- | ------------------------------------- |
-| `Enter`   | `git checkout` (or create) `issue/<id>` |
-| `v`       | Show detail preview                   |
-| `Esc`     | Hide detail preview                   |
-| `e`       | Edit the selected issue (TUI form)    |
-| `c`       | Create a new issue (TUI form)         |
-| `s`       | Change status (then `1`–`4` to pick)  |
-| `d`       | Delete the selected issue (confirm)   |
-| `Ctrl-C`  | Quit                                  |
+| Key             | Action                                  |
+| --------------- | --------------------------------------- |
+| `Enter`         | `git checkout` (or create) `issue/<id>` |
+| `j` / `k`       | Move cursor (also `↓` / `↑`)            |
+| `g` / `G`       | Jump to top / bottom                    |
+| `v`             | Toggle detail preview                   |
+| `/`             | Filter (case-insensitive substring)     |
+| `e`             | Edit the selected issue (TUI form)      |
+| `c`             | Create a new issue (TUI form)           |
+| `s`             | Change status (then `1`–`4` or `Enter`) |
+| `d`             | Delete the selected issue (confirm)     |
+| `q` / `Esc`     | Quit                                    |
+| `Ctrl-C`        | Quit                                    |
 
 Filters: `--all` includes Done, `--status="In Progress"` filters by one status.
 

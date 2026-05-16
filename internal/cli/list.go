@@ -5,10 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
-	"github.com/FukeKazki/issue-cli/internal/fzf"
 	"github.com/FukeKazki/issue-cli/internal/gitx"
 	"github.com/FukeKazki/issue-cli/internal/model"
 	"github.com/FukeKazki/issue-cli/internal/store"
@@ -23,93 +21,63 @@ func List(args []string) error {
 		return err
 	}
 
-	if err := fzf.Available(); err != nil {
-		return err
-	}
-
 	s, err := store.New()
 	if err != nil {
 		return err
 	}
 
-	self, err := os.Executable()
-	if err != nil {
-		return err
-	}
-
+	lastID := 0
 	for {
 		issues, err := s.LoadAll()
 		if err != nil {
 			return err
 		}
 		issues = filterIssues(issues, *all, *statusFilter)
-		if len(issues) == 0 {
-			fmt.Fprintln(os.Stderr, "no issues to show")
-			return nil
+
+		header := "Issues"
+		if *statusFilter != "" {
+			header = fmt.Sprintf("Issues — status=%s", *statusFilter)
+		} else if *all {
+			header = "Issues (all)"
+		} else {
+			header = "Issues (open)"
 		}
 
-		lines := make([]string, 0, len(issues))
-		for _, iss := range issues {
-			lines = append(lines, fmt.Sprintf("#%d\t[%s]\t%s", iss.ID, iss.Status, iss.Title))
-		}
-
-		opts := []string{
-			"--ansi",
-			"--reverse",
-			"--no-mouse",
-			"--delimiter=\t",
-			"--header=Enter: checkout / v: detail / e: edit / c: create / s: status / d: delete / Esc: close preview / Ctrl-C: quit",
-			"--preview", self + " _show {1}",
-			"--preview-window=right:60%:hidden",
-			"--bind=v:show-preview",
-			"--bind=esc:hide-preview",
-			"--expect=enter,e,c,s,d",
-		}
-
-		res, err := fzf.Run(lines, opts)
+		res, err := tui.RunList(issues, header, lastID)
 		if err != nil {
 			return err
 		}
-		// fzf returned without a key press (Ctrl-C / empty): exit.
-		if res.Key == "" && res.Line == "" {
+		lastID = res.IssueID
+
+		switch res.Action {
+		case tui.ListActionQuit:
 			return nil
-		}
-
-		id := parseID(res.Line)
-
-		switch res.Key {
-		case "enter":
-			if id == 0 {
+		case tui.ListActionCheckout:
+			if res.IssueID == 0 {
 				return nil
 			}
-			return gitx.CheckoutIssue(id)
-		case "e":
-			if id == 0 {
-				continue
-			}
-			if err := editIssue(s, id); err != nil {
+			return gitx.CheckoutIssue(res.IssueID)
+		case tui.ListActionEdit:
+			if err := editIssue(s, res.IssueID); err != nil {
 				fmt.Fprintln(os.Stderr, "edit failed:", err)
 			}
-		case "c":
-			if err := createFromList(s); err != nil {
+		case tui.ListActionCreate:
+			if id, err := createFromList(s); err != nil {
 				fmt.Fprintln(os.Stderr, "create failed:", err)
+			} else if id > 0 {
+				lastID = id
 			}
-		case "s":
-			if id == 0 {
-				continue
-			}
-			if err := changeStatus(s, id); err != nil {
+		case tui.ListActionStatus:
+			if err := changeStatus(s, res.IssueID); err != nil {
 				fmt.Fprintln(os.Stderr, "status change failed:", err)
 			}
-		case "d":
-			if id == 0 {
-				continue
-			}
-			if err := deleteIssue(s, id); err != nil {
+		case tui.ListActionDelete:
+			deleted, err := deleteIssue(s, res.IssueID)
+			if err != nil {
 				fmt.Fprintln(os.Stderr, "delete failed:", err)
+			} else if deleted {
+				lastID = 0
 			}
-		default:
-			return nil
 		}
 	}
 }
@@ -127,19 +95,6 @@ func filterIssues(in []model.Issue, all bool, statusFilter string) []model.Issue
 		out = append(out, iss)
 	}
 	return out
-}
-
-func parseID(line string) int {
-	if line == "" {
-		return 0
-	}
-	first := strings.SplitN(line, "\t", 2)[0]
-	raw := strings.TrimPrefix(first, "#")
-	id, err := strconv.Atoi(raw)
-	if err != nil {
-		return 0
-	}
-	return id
 }
 
 func editIssue(s *store.Store, id int) error {
@@ -161,90 +116,52 @@ func changeStatus(s *store.Store, id int) error {
 	if err != nil {
 		return err
 	}
-	statuses := model.AllStatuses()
-	lines := make([]string, 0, len(statuses))
-	for i, st := range statuses {
-		marker := " "
-		if iss.Status == st {
-			marker = "*"
-		}
-		lines = append(lines, fmt.Sprintf("%d %s %s", i+1, marker, st))
-	}
-	opts := []string{
-		"--reverse",
-		"--no-mouse",
-		fmt.Sprintf("--header=Status for #%d (current marked *) — 1:TODO  2:In Progress  3:Reviews  4:Done  Esc:cancel", id),
-		"--expect=1,2,3,4,enter",
-	}
-	res, err := fzf.Run(lines, opts)
+	res, err := tui.RunStatusPicker(fmt.Sprintf("Status for #%d", id), iss.Status)
 	if err != nil {
 		return err
 	}
-	var newStatus model.Status
-	switch res.Key {
-	case "1":
-		newStatus = model.StatusTODO
-	case "2":
-		newStatus = model.StatusInProgress
-	case "3":
-		newStatus = model.StatusReviews
-	case "4":
-		newStatus = model.StatusDone
-	case "enter":
-		if res.Line == "" {
-			return nil
-		}
-		idx, err := strconv.Atoi(strings.SplitN(res.Line, " ", 2)[0])
-		if err != nil || idx < 1 || idx > len(statuses) {
-			return nil
-		}
-		newStatus = statuses[idx-1]
-	default:
+	if !res.Selected || res.Status == iss.Status {
 		return nil
 	}
-	if iss.Status == newStatus {
-		return nil
-	}
-	iss.Status = newStatus
+	iss.Status = res.Status
 	return s.Save(iss)
 }
 
-func deleteIssue(s *store.Store, id int) error {
+func deleteIssue(s *store.Store, id int) (bool, error) {
 	iss, err := s.Load(id)
 	if err != nil {
-		return err
+		return false, err
 	}
-	lines := []string{"No, cancel", "Yes, delete"}
-	opts := []string{
-		"--reverse",
-		"--no-mouse",
-		fmt.Sprintf("--header=Delete #%d %q? Enter to confirm, Esc to cancel", id, iss.Title),
-		"--expect=enter",
-	}
-	res, err := fzf.Run(lines, opts)
+	ok, err := tui.RunConfirm(fmt.Sprintf("Delete #%d %q?", id, iss.Title))
 	if err != nil {
-		return err
+		return false, err
 	}
-	if res.Key != "enter" || res.Line != "Yes, delete" {
-		return nil
+	if !ok {
+		return false, nil
 	}
-	return s.Delete(id)
+	if err := s.Delete(id); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
-func createFromList(s *store.Store) error {
+func createFromList(s *store.Store) (int, error) {
 	id, err := s.NextID()
 	if err != nil {
-		return err
+		return 0, err
 	}
 	iss := &model.Issue{ID: id, Status: model.StatusTODO}
 	if err := tui.RunForm(iss, "Create Issue"); err != nil {
 		if errors.Is(err, tui.ErrCanceled) {
-			return nil
+			return 0, nil
 		}
-		return err
+		return 0, err
 	}
 	if strings.TrimSpace(iss.Title) == "" {
-		return fmt.Errorf("title is required")
+		return 0, fmt.Errorf("title is required")
 	}
-	return s.Save(iss)
+	if err := s.Save(iss); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
