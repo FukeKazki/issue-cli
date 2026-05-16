@@ -115,6 +115,16 @@ func (s *Store) NextID() (int, error) {
 	return max + 1, nil
 }
 
+func (s *Store) Delete(id int) error {
+	if err := os.Remove(s.Path(id)); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("issue #%d not found", id)
+		}
+		return err
+	}
+	return nil
+}
+
 func (s *Store) Save(iss *model.Issue) error {
 	if err := validate(iss); err != nil {
 		return err

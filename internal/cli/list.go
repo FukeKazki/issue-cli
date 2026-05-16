@@ -58,12 +58,12 @@ func List(args []string) error {
 			"--reverse",
 			"--no-mouse",
 			"--delimiter=\t",
-			"--header=Enter: checkout / v: detail / e: edit / c: create / s: status / Esc: close preview / Ctrl-C: quit",
+			"--header=Enter: checkout / v: detail / e: edit / c: create / s: status / d: delete / Esc: close preview / Ctrl-C: quit",
 			"--preview", self + " _show {1}",
 			"--preview-window=right:60%:hidden",
 			"--bind=v:show-preview",
 			"--bind=esc:hide-preview",
-			"--expect=enter,e,c,s",
+			"--expect=enter,e,c,s,d",
 		}
 
 		res, err := fzf.Run(lines, opts)
@@ -100,6 +100,13 @@ func List(args []string) error {
 			}
 			if err := changeStatus(s, id); err != nil {
 				fmt.Fprintln(os.Stderr, "status change failed:", err)
+			}
+		case "d":
+			if id == 0 {
+				continue
+			}
+			if err := deleteIssue(s, id); err != nil {
+				fmt.Fprintln(os.Stderr, "delete failed:", err)
 			}
 		default:
 			return nil
@@ -200,6 +207,28 @@ func changeStatus(s *store.Store, id int) error {
 	}
 	iss.Status = newStatus
 	return s.Save(iss)
+}
+
+func deleteIssue(s *store.Store, id int) error {
+	iss, err := s.Load(id)
+	if err != nil {
+		return err
+	}
+	lines := []string{"No, cancel", "Yes, delete"}
+	opts := []string{
+		"--reverse",
+		"--no-mouse",
+		fmt.Sprintf("--header=Delete #%d %q? Enter to confirm, Esc to cancel", id, iss.Title),
+		"--expect=enter",
+	}
+	res, err := fzf.Run(lines, opts)
+	if err != nil {
+		return err
+	}
+	if res.Key != "enter" || res.Line != "Yes, delete" {
+		return nil
+	}
+	return s.Delete(id)
 }
 
 func createFromList(s *store.Store) error {

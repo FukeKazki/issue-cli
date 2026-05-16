@@ -76,6 +76,22 @@ func TestSaveRejectsEmptyTitle(t *testing.T) {
 	}
 }
 
+func TestDelete(t *testing.T) {
+	s := newTestStore(t)
+	if err := s.Save(&model.Issue{ID: 1, Title: "t", Status: model.StatusTODO}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.Delete(1); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(s.Path(1)); !os.IsNotExist(err) {
+		t.Fatalf("file should be removed, got err=%v", err)
+	}
+	if err := s.Delete(1); err == nil {
+		t.Fatal("expected error when deleting missing issue")
+	}
+}
+
 func TestLoadAllSorted(t *testing.T) {
 	s := newTestStore(t)
 	for _, id := range []int{3, 1, 2} {
