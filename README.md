@@ -22,9 +22,17 @@ Requires `fzf` and `git` on `PATH`.
 ## Usage
 
 ```
+issue                                  # show the issue for the current issue/<id> branch
 issue list [--all] [--status=STATUS]
 issue create [--title TITLE]
+issue current                          # alias for the no-arg form
 ```
+
+### `issue` (no args) / `issue current`
+
+If the current Git branch matches `issue/<id>`, prints the matching issue's
+detail (title, status, description, references, scope, timestamps). On any
+other branch, exits with an error and prints usage.
 
 ### `issue list`
 
