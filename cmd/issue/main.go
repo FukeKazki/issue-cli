@@ -51,13 +51,15 @@ func usage() {
   issue create [--title TITLE]
   issue current                          alias for the no-arg form
 
-Keys in list (fzf):
+Keys in list:
   Enter   checkout branch issue/<id>
-  v       show detail (preview)
-  Esc     hide detail
+  v       toggle detail preview
   e       edit issue
   c       create new issue
-  s       change status (then 1-4)
-  Ctrl-C  quit
+  s       change status (then 1-4 or enter)
+  d       delete issue (confirm)
+  /       filter
+  j/k     move down/up (also ↓/↑)
+  q/Esc   quit
 `)
 }
