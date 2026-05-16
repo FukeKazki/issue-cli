@@ -54,6 +54,8 @@ With `--title "..."` → creates with that title, status `TODO`, no references/s
 id: 1
 title: Implement feature X
 status: TODO        # TODO | In Progress | Reviews | Done
+description: |
+  Background, acceptance criteria, or any longer-form notes.
 references:
   - https://example.com/spec
 scope:

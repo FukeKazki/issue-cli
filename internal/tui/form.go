@@ -18,6 +18,7 @@ var ErrCanceled = errors.New("canceled")
 const (
 	focusTitle = iota
 	focusStatus
+	focusDescription
 	focusRefs
 	focusScope
 	focusCount
@@ -27,6 +28,7 @@ const (
 	defaultFormWidth    = 56
 	defaultPreviewWidth = 40
 	textareaHeight      = 4
+	descAreaHeight      = 6
 )
 
 var (
@@ -64,6 +66,7 @@ type formModel struct {
 	header     string
 	iss        *model.Issue
 	titleInput textinput.Model
+	descArea   textarea.Model
 	refsArea   textarea.Model
 	scopeArea  textarea.Model
 	statuses   []model.Status
@@ -84,6 +87,16 @@ func newFormModel(iss *model.Issue, header string) formModel {
 	ti.Width = defaultFormWidth - 6
 	ti.SetValue(iss.Title)
 	ti.Focus()
+
+	desc := textarea.New()
+	desc.Placeholder = "What needs to happen and why?"
+	desc.Prompt = "│ "
+	desc.ShowLineNumbers = false
+	desc.SetValue(iss.Description)
+	desc.SetWidth(defaultFormWidth - 2)
+	desc.SetHeight(descAreaHeight)
+	desc.CharLimit = 0
+	desc.Blur()
 
 	refs := textarea.New()
 	refs.Placeholder = "https://example.com"
@@ -120,6 +133,7 @@ func newFormModel(iss *model.Issue, header string) formModel {
 		header:     header,
 		iss:        iss,
 		titleInput: ti,
+		descArea:   desc,
 		refsArea:   refs,
 		scopeArea:  scope,
 		statuses:   statuses,
@@ -142,6 +156,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			fw = 20
 		}
 		m.titleInput.Width = fw - 2
+		m.descArea.SetWidth(fw)
 		m.refsArea.SetWidth(fw)
 		m.scopeArea.SetWidth(fw)
 		return m, nil
@@ -191,6 +206,8 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.focus {
 	case focusTitle:
 		m.titleInput, cmd = m.titleInput.Update(msg)
+	case focusDescription:
+		m.descArea, cmd = m.descArea.Update(msg)
 	case focusRefs:
 		m.refsArea, cmd = m.refsArea.Update(msg)
 	case focusScope:
@@ -205,6 +222,11 @@ func (m *formModel) applyFocus() {
 		m.titleInput.Focus()
 	} else {
 		m.titleInput.Blur()
+	}
+	if m.focus == focusDescription {
+		m.descArea.Focus()
+	} else {
+		m.descArea.Blur()
 	}
 	if m.focus == focusRefs {
 		m.refsArea.Focus()
@@ -278,6 +300,13 @@ func (m formModel) renderFormPanel() string {
 	b.WriteString(m.renderStatusRow())
 	b.WriteString("\n\n")
 
+	b.WriteString(m.fieldLabel("DESCRIPTION", focusDescription))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("multi-line"))
+	b.WriteString("\n")
+	b.WriteString(m.descArea.View())
+	b.WriteString("\n\n")
+
 	b.WriteString(m.fieldLabel("REFERENCES", focusRefs))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("one per line"))
@@ -340,6 +369,7 @@ func (m formModel) previewIssue() model.Issue {
 		out.Title = "(untitled)"
 	}
 	out.Status = m.statuses[m.statusIdx]
+	out.Description = strings.TrimRight(m.descArea.Value(), "\n")
 	out.References = splitLines(m.refsArea.Value())
 	out.Scope = normalizeScope(splitLines(m.scopeArea.Value()))
 	return out
@@ -367,6 +397,7 @@ func RunForm(iss *model.Issue, header string) error {
 	}
 	iss.Title = strings.TrimSpace(fm.titleInput.Value())
 	iss.Status = fm.statuses[fm.statusIdx]
+	iss.Description = strings.TrimRight(fm.descArea.Value(), "\n")
 	iss.References = splitLines(fm.refsArea.Value())
 	iss.Scope = normalizeScope(splitLines(fm.scopeArea.Value()))
 	return nil
