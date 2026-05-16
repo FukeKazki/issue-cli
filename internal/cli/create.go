@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/FukeKazki/issue-cli/internal/model"
@@ -35,6 +36,10 @@ func Create(args []string) error {
 		}
 	} else {
 		if err := tui.RunForm(iss, "Create Issue"); err != nil {
+			if errors.Is(err, tui.ErrCanceled) {
+				fmt.Fprintln(os.Stderr, "canceled")
+				return nil
+			}
 			return err
 		}
 		if strings.TrimSpace(iss.Title) == "" {

@@ -2,65 +2,373 @@ package tui
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/huh"
 	"github.com/FukeKazki/issue-cli/internal/model"
+	"github.com/charmbracelet/bubbles/textarea"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
-func RunForm(iss *model.Issue, title string) error {
-	refsText := strings.Join(iss.References, "\n")
-	scopeText := strings.Join(iss.Scope, "\n")
-	statusStr := string(iss.Status)
-	if statusStr == "" {
-		statusStr = string(model.StatusTODO)
+// ErrCanceled is returned by RunForm when the user aborts with Esc/Ctrl+C.
+var ErrCanceled = errors.New("canceled")
+
+const (
+	focusTitle = iota
+	focusStatus
+	focusRefs
+	focusScope
+	focusCount
+)
+
+const (
+	defaultFormWidth    = 56
+	defaultPreviewWidth = 40
+	textareaHeight      = 4
+)
+
+var (
+	colAccent = lipgloss.Color("13")
+	colTitle  = lipgloss.Color("12")
+	colMuted  = lipgloss.Color("240")
+	colError  = lipgloss.Color("9")
+
+	panelStyle = lipgloss.NewStyle().
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(colMuted).
+			Padding(0, 1)
+
+	panelHeaderStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(colTitle).
+				MarginBottom(1)
+
+	labelBlur = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colMuted)
+
+	labelFocus = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colAccent)
+
+	hintStyle = lipgloss.NewStyle().Faint(true)
+
+	footerStyle = lipgloss.NewStyle().Faint(true)
+
+	errorStyle = lipgloss.NewStyle().Foreground(colError).Bold(true)
+)
+
+type formModel struct {
+	header     string
+	iss        *model.Issue
+	titleInput textinput.Model
+	refsArea   textarea.Model
+	scopeArea  textarea.Model
+	statuses   []model.Status
+	statusIdx  int
+	focus      int
+	width      int
+	height     int
+	submitted  bool
+	canceled   bool
+	errMsg     string
+}
+
+func newFormModel(iss *model.Issue, header string) formModel {
+	ti := textinput.New()
+	ti.Placeholder = "Concise title"
+	ti.CharLimit = 200
+	ti.Prompt = "▏ "
+	ti.Width = defaultFormWidth - 6
+	ti.SetValue(iss.Title)
+	ti.Focus()
+
+	refs := textarea.New()
+	refs.Placeholder = "https://example.com"
+	refs.Prompt = "│ "
+	refs.ShowLineNumbers = false
+	refs.SetValue(strings.Join(iss.References, "\n"))
+	refs.SetWidth(defaultFormWidth - 2)
+	refs.SetHeight(textareaHeight)
+	refs.CharLimit = 0
+	refs.Blur()
+
+	scope := textarea.New()
+	scope.Placeholder = "@apps/web/foo.tsx"
+	scope.Prompt = "│ "
+	scope.ShowLineNumbers = false
+	scope.SetValue(strings.Join(iss.Scope, "\n"))
+	scope.SetWidth(defaultFormWidth - 2)
+	scope.SetHeight(textareaHeight)
+	scope.CharLimit = 0
+	scope.Blur()
+
+	statuses := model.AllStatuses()
+	idx := 0
+	if iss.Status != "" {
+		for i, s := range statuses {
+			if s == iss.Status {
+				idx = i
+				break
+			}
+		}
 	}
 
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("Title").
-				Value(&iss.Title).
-				Validate(func(s string) error {
-					if strings.TrimSpace(s) == "" {
-						return errors.New("title is required")
-					}
-					return nil
-				}),
-			huh.NewSelect[string]().
-				Title("Status").
-				Options(
-					huh.NewOption(string(model.StatusTODO), string(model.StatusTODO)),
-					huh.NewOption(string(model.StatusInProgress), string(model.StatusInProgress)),
-					huh.NewOption(string(model.StatusReviews), string(model.StatusReviews)),
-					huh.NewOption(string(model.StatusDone), string(model.StatusDone)),
-				).
-				Value(&statusStr),
-			huh.NewText().
-				Title("References (one per line)").
-				Description("URLs or notes; blank lines ignored").
-				Value(&refsText),
-			huh.NewText().
-				Title("Scope (one path per line)").
-				Description("@ is auto-prepended if missing").
-				Value(&scopeText),
-		),
-	).WithTheme(huh.ThemeBase()).WithShowHelp(true)
+	return formModel{
+		header:     header,
+		iss:        iss,
+		titleInput: ti,
+		refsArea:   refs,
+		scopeArea:  scope,
+		statuses:   statuses,
+		statusIdx:  idx,
+		focus:      focusTitle,
+	}
+}
 
-	if title != "" {
-		form = form.WithTheme(huh.ThemeBase())
+func (m formModel) Init() tea.Cmd {
+	return textinput.Blink
+}
+
+func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		fw := m.formColWidth() - 4 // border + padding
+		if fw < 20 {
+			fw = 20
+		}
+		m.titleInput.Width = fw - 2
+		m.refsArea.SetWidth(fw)
+		m.scopeArea.SetWidth(fw)
+		return m, nil
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "esc":
+			m.canceled = true
+			return m, tea.Quit
+		case "ctrl+s":
+			if strings.TrimSpace(m.titleInput.Value()) == "" {
+				m.errMsg = "title is required"
+				m.focus = focusTitle
+				m.applyFocus()
+				return m, nil
+			}
+			m.submitted = true
+			return m, tea.Quit
+		case "tab":
+			m.focus = (m.focus + 1) % focusCount
+			m.applyFocus()
+			return m, nil
+		case "shift+tab":
+			m.focus = (m.focus - 1 + focusCount) % focusCount
+			m.applyFocus()
+			return m, nil
+		case "enter":
+			if m.focus == focusTitle || m.focus == focusStatus {
+				m.focus = (m.focus + 1) % focusCount
+				m.applyFocus()
+				return m, nil
+			}
+		}
+
+		if m.focus == focusStatus {
+			switch msg.String() {
+			case "left", "h", "up", "k":
+				m.statusIdx = (m.statusIdx - 1 + len(m.statuses)) % len(m.statuses)
+			case "right", "l", "down", "j", " ":
+				m.statusIdx = (m.statusIdx + 1) % len(m.statuses)
+			}
+			return m, nil
+		}
 	}
 
-	if err := form.Run(); err != nil {
+	var cmd tea.Cmd
+	switch m.focus {
+	case focusTitle:
+		m.titleInput, cmd = m.titleInput.Update(msg)
+	case focusRefs:
+		m.refsArea, cmd = m.refsArea.Update(msg)
+	case focusScope:
+		m.scopeArea, cmd = m.scopeArea.Update(msg)
+	}
+	return m, cmd
+}
+
+func (m *formModel) applyFocus() {
+	m.errMsg = ""
+	if m.focus == focusTitle {
+		m.titleInput.Focus()
+	} else {
+		m.titleInput.Blur()
+	}
+	if m.focus == focusRefs {
+		m.refsArea.Focus()
+	} else {
+		m.refsArea.Blur()
+	}
+	if m.focus == focusScope {
+		m.scopeArea.Focus()
+	} else {
+		m.scopeArea.Blur()
+	}
+}
+
+func (m formModel) View() string {
+	form := m.renderFormPanel()
+	preview := m.renderPreviewPanel()
+	body := lipgloss.JoinHorizontal(lipgloss.Top, form, preview)
+	return body + "\n" + m.renderFooter()
+}
+
+func (m formModel) formColWidth() int {
+	if m.width <= 0 {
+		return defaultFormWidth
+	}
+	w := m.width * 58 / 100
+	if w < defaultFormWidth {
+		w = defaultFormWidth
+	}
+	if w > m.width-defaultPreviewWidth-2 {
+		w = m.width - defaultPreviewWidth - 2
+	}
+	if w < 40 {
+		w = 40
+	}
+	return w
+}
+
+func (m formModel) previewColWidth() int {
+	if m.width <= 0 {
+		return defaultPreviewWidth
+	}
+	w := m.width - m.formColWidth() - 2
+	if w < defaultPreviewWidth {
+		w = defaultPreviewWidth
+	}
+	return w
+}
+
+func (m formModel) renderFormPanel() string {
+	header := m.header
+	if header == "" {
+		header = "Issue"
+	}
+	if m.iss.ID > 0 {
+		header = fmt.Sprintf("%s  #%d", header, m.iss.ID)
+	}
+
+	var b strings.Builder
+	b.WriteString(panelHeaderStyle.Render(header))
+	b.WriteString("\n")
+
+	b.WriteString(m.fieldLabel("TITLE", focusTitle))
+	b.WriteString("\n")
+	b.WriteString(m.titleInput.View())
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("STATUS", focusStatus))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("←/→ change"))
+	b.WriteString("\n")
+	b.WriteString(m.renderStatusRow())
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("REFERENCES", focusRefs))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("one per line"))
+	b.WriteString("\n")
+	b.WriteString(m.refsArea.View())
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("SCOPE", focusScope))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("one path per line; @ auto-prefixed"))
+	b.WriteString("\n")
+	b.WriteString(m.scopeArea.View())
+
+	if m.errMsg != "" {
+		b.WriteString("\n\n")
+		b.WriteString(errorStyle.Render("✗ " + m.errMsg))
+	}
+
+	return panelStyle.Width(m.formColWidth()).Render(b.String())
+}
+
+func (m formModel) fieldLabel(label string, target int) string {
+	if m.focus == target {
+		return labelFocus.Render("▸ " + label)
+	}
+	return labelBlur.Render("  " + label)
+}
+
+func (m formModel) renderStatusRow() string {
+	parts := make([]string, 0, len(m.statuses))
+	for i, s := range m.statuses {
+		text := string(s)
+		if i == m.statusIdx {
+			style := lipgloss.NewStyle().
+				Foreground(statusColor[s]).
+				Bold(true).
+				Background(lipgloss.Color("236")).
+				Padding(0, 1)
+			parts = append(parts, style.Render("● "+text))
+		} else {
+			style := lipgloss.NewStyle().
+				Foreground(colMuted).
+				Padding(0, 1)
+			parts = append(parts, style.Render("○ "+text))
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func (m formModel) renderPreviewPanel() string {
+	preview := m.previewIssue()
+	body := panelHeaderStyle.Render("PREVIEW") + "\n" + RenderDetail(&preview)
+	return panelStyle.Width(m.previewColWidth()).Render(body)
+}
+
+func (m formModel) previewIssue() model.Issue {
+	out := *m.iss
+	out.Title = strings.TrimSpace(m.titleInput.Value())
+	if out.Title == "" {
+		out.Title = "(untitled)"
+	}
+	out.Status = m.statuses[m.statusIdx]
+	out.References = splitLines(m.refsArea.Value())
+	out.Scope = normalizeScope(splitLines(m.scopeArea.Value()))
+	return out
+}
+
+func (m formModel) renderFooter() string {
+	keys := []string{
+		"tab/shift+tab move",
+		"ctrl+s save",
+		"esc cancel",
+	}
+	return footerStyle.Render(strings.Join(keys, "  •  "))
+}
+
+func RunForm(iss *model.Issue, header string) error {
+	m := newFormModel(iss, header)
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	finalModel, err := p.Run()
+	if err != nil {
 		return err
 	}
-
-	iss.Title = strings.TrimSpace(iss.Title)
-	if st, ok := model.ParseStatus(statusStr); ok {
-		iss.Status = st
+	fm := finalModel.(formModel)
+	if fm.canceled || !fm.submitted {
+		return ErrCanceled
 	}
-	iss.References = splitLines(refsText)
-	iss.Scope = normalizeScope(splitLines(scopeText))
+	iss.Title = strings.TrimSpace(fm.titleInput.Value())
+	iss.Status = fm.statuses[fm.statusIdx]
+	iss.References = splitLines(fm.refsArea.Value())
+	iss.Scope = normalizeScope(splitLines(fm.scopeArea.Value()))
 	return nil
 }
 
