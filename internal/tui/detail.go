@@ -30,6 +30,16 @@ func RenderDetail(iss *model.Issue) string {
 	fmt.Fprintln(&b, labelStyle.Render("Status: ")+statusBadge)
 	fmt.Fprintln(&b)
 
+	fmt.Fprintln(&b, labelStyle.Render("Description:"))
+	if strings.TrimSpace(iss.Description) == "" {
+		fmt.Fprintln(&b, "  (none)")
+	} else {
+		for _, line := range strings.Split(iss.Description, "\n") {
+			fmt.Fprintln(&b, "  "+line)
+		}
+	}
+	fmt.Fprintln(&b)
+
 	fmt.Fprintln(&b, labelStyle.Render("References:"))
 	if len(iss.References) == 0 {
 		fmt.Fprintln(&b, "  (none)")

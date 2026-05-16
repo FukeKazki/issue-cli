@@ -29,13 +29,14 @@ func ParseStatus(s string) (Status, bool) {
 }
 
 type Issue struct {
-	ID         int       `yaml:"id"`
-	Title      string    `yaml:"title"`
-	Status     Status    `yaml:"status"`
-	References []string  `yaml:"references"`
-	Scope      []string  `yaml:"scope"`
-	CreatedAt  time.Time `yaml:"created_at"`
-	UpdatedAt  time.Time `yaml:"updated_at"`
+	ID          int       `yaml:"id"`
+	Title       string    `yaml:"title"`
+	Status      Status    `yaml:"status"`
+	Description string    `yaml:"description"`
+	References  []string  `yaml:"references"`
+	Scope       []string  `yaml:"scope"`
+	CreatedAt   time.Time `yaml:"created_at"`
+	UpdatedAt   time.Time `yaml:"updated_at"`
 }
 
 func (i *Issue) IsOpen() bool {
