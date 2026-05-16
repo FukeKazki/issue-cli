@@ -22,17 +22,16 @@ Requires `git` on `PATH`.
 ## Usage
 
 ```
-issue                                  # show the issue for the current issue/<id> branch
+issue                                  # show the issue for the current issue/<id> branch, or open the list TUI
 issue list [--all] [--status=STATUS]
 issue create [--title TITLE]
-issue current                          # alias for the no-arg form
 ```
 
-### `issue` (no args) / `issue current`
+### `issue` (no args)
 
 If the current Git branch matches `issue/<id>`, prints the matching issue's
 detail (title, status, description, references, scope, timestamps). On any
-other branch, exits with an error and prints usage.
+other branch, opens the list TUI (same as `issue list`).
 
 ### `issue list`
 

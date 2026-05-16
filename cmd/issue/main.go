@@ -9,10 +9,8 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		if err := cli.Current(nil); err != nil {
+		if err := cli.Default(); err != nil {
 			fmt.Fprintln(os.Stderr, "error:", err)
-			fmt.Fprintln(os.Stderr)
-			usage()
 			os.Exit(1)
 		}
 		return
@@ -26,8 +24,6 @@ func main() {
 		err = cli.List(args)
 	case "create", "new":
 		err = cli.Create(args)
-	case "current", "show":
-		err = cli.Current(args)
 	case "_show":
 		err = cli.Show(args)
 	case "-h", "--help", "help":
@@ -46,10 +42,9 @@ func main() {
 
 func usage() {
 	fmt.Fprint(os.Stderr, `Usage:
-  issue                                  show the issue for the current issue/<id> branch
+  issue                                  on issue/<id>: show that issue; otherwise: open list TUI
   issue list [--all] [--status=STATUS]
   issue create [--title TITLE]
-  issue current                          alias for the no-arg form
 
 Keys in list:
   Enter   checkout branch issue/<id>
