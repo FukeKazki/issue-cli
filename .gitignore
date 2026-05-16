@@ -4,3 +4,6 @@
 
 # Editor / OS junk
 .DS_Store
+
+# issue-cli
+.issues/
