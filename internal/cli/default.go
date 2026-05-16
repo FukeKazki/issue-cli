@@ -8,19 +8,15 @@ import (
 	"github.com/FukeKazki/issue-cli/internal/tui"
 )
 
-// Current prints the issue detail for the issue branch the user is currently on
-// (e.g. `issue/2` → issue #2). Returns an error when not on an issue branch.
-func Current(args []string) error {
+// Default is the no-arg entry point. On an `issue/<id>` branch it prints the
+// matching issue's detail; otherwise it opens the list TUI.
+func Default() error {
 	id, err := gitx.CurrentIssueID()
 	if err != nil {
 		return err
 	}
 	if id == 0 {
-		br, _ := gitx.CurrentBranch()
-		if br == "" {
-			return fmt.Errorf("not on an issue branch (detached HEAD)")
-		}
-		return fmt.Errorf("not on an issue branch (current: %s)", br)
+		return List(nil)
 	}
 	s, err := store.New()
 	if err != nil {
