@@ -1,8 +1,0 @@
-id: 5
-title: Statusを一覧画面で変更できるようにする
-status: TODO
-description: 完了したタスクのstatusをDoneにしたくなった。一覧画面でsを押し → 1,2,3,4で選択できるように
-references: []
-scope: []
-created_at: 2026-05-16T20:21:02.727348+09:00
-updated_at: 2026-05-16T20:21:02.727348+09:00
