@@ -45,6 +45,7 @@ Opens `fzf` with open issues (TODO / In Progress / Reviews).
 | `Esc`     | Hide detail preview                   |
 | `e`       | Edit the selected issue (TUI form)    |
 | `c`       | Create a new issue (TUI form)         |
+| `s`       | Change status (then `1`–`4` to pick)  |
 | `Ctrl-C`  | Quit                                  |
 
 Filters: `--all` includes Done, `--status="In Progress"` filters by one status.

@@ -57,6 +57,7 @@ Keys in list (fzf):
   Esc     hide detail
   e       edit issue
   c       create new issue
+  s       change status (then 1-4)
   Ctrl-C  quit
 `)
 }
