@@ -25,10 +25,9 @@ const (
 )
 
 const (
-	defaultFormWidth    = 56
-	defaultPreviewWidth = 40
-	textareaHeight      = 4
-	descAreaHeight      = 6
+	defaultFormWidth = 56
+	textareaHeight   = 4
+	descAreaHeight   = 6
 )
 
 var (
@@ -241,36 +240,16 @@ func (m *formModel) applyFocus() {
 }
 
 func (m formModel) View() string {
-	form := m.renderFormPanel()
-	preview := m.renderPreviewPanel()
-	body := lipgloss.JoinHorizontal(lipgloss.Top, form, preview)
-	return body + "\n" + m.renderFooter()
+	return m.renderFormPanel() + "\n" + m.renderFooter()
 }
 
 func (m formModel) formColWidth() int {
 	if m.width <= 0 {
 		return defaultFormWidth
 	}
-	w := m.width * 58 / 100
+	w := m.width - 2
 	if w < defaultFormWidth {
 		w = defaultFormWidth
-	}
-	if w > m.width-defaultPreviewWidth-2 {
-		w = m.width - defaultPreviewWidth - 2
-	}
-	if w < 40 {
-		w = 40
-	}
-	return w
-}
-
-func (m formModel) previewColWidth() int {
-	if m.width <= 0 {
-		return defaultPreviewWidth
-	}
-	w := m.width - m.formColWidth() - 2
-	if w < defaultPreviewWidth {
-		w = defaultPreviewWidth
 	}
 	return w
 }
@@ -354,25 +333,6 @@ func (m formModel) renderStatusRow() string {
 		}
 	}
 	return strings.Join(parts, " ")
-}
-
-func (m formModel) renderPreviewPanel() string {
-	preview := m.previewIssue()
-	body := panelHeaderStyle.Render("PREVIEW") + "\n" + RenderDetail(&preview)
-	return panelStyle.Width(m.previewColWidth()).Render(body)
-}
-
-func (m formModel) previewIssue() model.Issue {
-	out := *m.iss
-	out.Title = strings.TrimSpace(m.titleInput.Value())
-	if out.Title == "" {
-		out.Title = "(untitled)"
-	}
-	out.Status = m.statuses[m.statusIdx]
-	out.Description = strings.TrimRight(m.descArea.Value(), "\n")
-	out.References = splitLines(m.refsArea.Value())
-	out.Scope = normalizeScope(splitLines(m.scopeArea.Value()))
-	return out
 }
 
 func (m formModel) renderFooter() string {
