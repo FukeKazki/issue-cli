@@ -86,3 +86,22 @@ is up to you — the CLI doesn't touch `.gitignore`.
 
 Branch switches use `git checkout` directly, so an unclean working tree will
 abort with git's own warning.
+
+## Claude Code skill
+
+`skills/issue-cli/SKILL.md` is a Claude Code skill that teaches the agent how
+to drive this CLI from a non-interactive context (when to call `issue create
+--title`, when to read `.issues/<id>.yaml` directly, branch convention, etc.).
+
+Install it via [apm](https://github.com/yoshinani-dev/apm) by adding the
+following to your project's `apm.yml`:
+
+```yaml
+dependencies:
+  apm: [
+    FukeKazki/issue-cli/skills/issue-cli
+  ]
+```
+
+`apm install` deploys it under `.claude/skills/issue-cli/` (and
+`.agents/skills/issue-cli/`) in the consuming project.
