@@ -1,0 +1,14 @@
+lockfile_version: '1'
+generated_at: '2026-05-17T01:03:17.057171+00:00'
+apm_version: 0.12.0
+dependencies:
+- repo_url: yoshinani-dev/skills
+  host: github.com
+  resolved_commit: 676a5ff794f9300e58c5a81325b89dcfc4b2f0b9
+  virtual_path: skills/submit-pr
+  is_virtual: true
+  package_type: claude_skill
+  deployed_files:
+  - .agents/skills/submit-pr
+  - .claude/skills/submit-pr
+  content_hash: sha256:17056f9be95b2d534a20dc9912027b941d683778c7b6f46049ec67bc69070d89
