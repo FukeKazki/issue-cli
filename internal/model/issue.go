@@ -28,6 +28,17 @@ func ParseStatus(s string) (Status, bool) {
 	return "", false
 }
 
+// StatusRank returns a monotonic rank for a status used to order transitions.
+// Unknown statuses return -1.
+func StatusRank(s Status) int {
+	for i, v := range AllStatuses() {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}
+
 type Issue struct {
 	ID          int       `yaml:"id"`
 	Title       string    `yaml:"title"`
@@ -41,4 +52,14 @@ type Issue struct {
 
 func (i *Issue) IsOpen() bool {
 	return i.Status != StatusDone
+}
+
+// AdvanceStatus moves Status forward to target only if target outranks the
+// current status. Returns true when the field changed.
+func (i *Issue) AdvanceStatus(target Status) bool {
+	if StatusRank(target) <= StatusRank(i.Status) {
+		return false
+	}
+	i.Status = target
+	return true
 }

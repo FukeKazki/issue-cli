@@ -60,7 +60,10 @@ func List(args []string) error {
 			if res.IssueID == 0 {
 				return nil
 			}
-			return gitx.CheckoutIssue(res.IssueID)
+			if err := gitx.CheckoutIssue(res.IssueID); err != nil {
+				return err
+			}
+			return advanceOnCheckout(s, res.IssueID)
 		case tui.ListActionEdit:
 			if err := editIssue(s, res.IssueID); err != nil {
 				fmt.Fprintln(os.Stderr, "edit failed:", err)
@@ -155,6 +158,24 @@ func deleteIssue(s *store.Store, id int) (bool, error) {
 		return false, err
 	}
 	return true, nil
+}
+
+// advanceOnCheckout bumps a freshly checked-out issue to In Progress if it's
+// still TODO. Already-advanced issues are left alone (forward-only).
+func advanceOnCheckout(s *store.Store, id int) error {
+	iss, err := s.Load(id)
+	if err != nil {
+		return err
+	}
+	from := iss.Status
+	if !iss.AdvanceStatus(model.StatusInProgress) {
+		return nil
+	}
+	if err := s.Save(iss); err != nil {
+		return err
+	}
+	fmt.Printf("#%d: %s → %s\n", id, from, iss.Status)
+	return nil
 }
 
 func createFromList(s *store.Store) (int, error) {
