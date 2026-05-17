@@ -38,19 +38,23 @@ other branch, opens the list TUI (same as `issue list`).
 Opens the built-in TUI with open issues (TODO / In Progress / Reviews).
 Left pane is the list, right pane shows the detail preview.
 
-| Key             | Action                                  |
-| --------------- | --------------------------------------- |
-| `Enter`         | `git checkout` (or create) `issue/<id>` |
-| `j` / `k`       | Move cursor (also `↓` / `↑`)            |
-| `g` / `G`       | Jump to top / bottom                    |
-| `v`             | Toggle detail preview                   |
-| `/`             | Filter (case-insensitive substring)     |
-| `e`             | Edit the selected issue (TUI form)      |
-| `c`             | Create a new issue (TUI form)           |
-| `s`             | Change status (then `1`–`4` or `Enter`) |
-| `d`             | Delete the selected issue (confirm)     |
-| `q` / `Esc`     | Quit                                    |
-| `Ctrl-C`        | Quit                                    |
+| Key             | Action                                                     |
+| --------------- | ---------------------------------------------------------- |
+| `Enter`         | Show issue detail (read-only; `q`/`Esc`/`Enter` to return) |
+| `c`             | `git checkout` (or create) `issue/<id>` and exit the list  |
+| `n`             | Create a new issue (TUI form)                              |
+| `e`             | Edit the selected issue (TUI form)                         |
+| `s`             | Change status (then `1`–`4` or `Enter`)                    |
+| `d`             | Delete the selected issue (confirm)                        |
+| `v`             | Toggle detail preview                                      |
+| `j` / `k`       | Move cursor (also `↓` / `↑`)                               |
+| `g` / `G`       | Jump to top / bottom                                       |
+| `/`             | Filter (case-insensitive substring)                        |
+| `q` / `Esc`     | Quit                                                       |
+| `Ctrl-C`        | Quit                                                       |
+
+`Enter` is non-destructive: it opens the detail view so `c` (checkout) can't
+be hit by accident.
 
 Filters: `--all` includes Done, `--status="In Progress"` filters by one status.
 
