@@ -39,4 +39,6 @@ Issues live under `<repo-root>/.issues/`. The CLI does not touch `.gitignore`; w
 
 ## APM / skills
 
-`apm.yml` + `apm.lock.yaml` describe Anthropic Package Manager dependencies; `apm_modules/` and `.agents/` are gitignored deploy targets, `.claude/skills/` is the symlinked skill source (currently just `submit-pr`).
+`apm.yml` + `apm.lock.yaml` describe Anthropic Package Manager dependencies; `apm_modules/` is the gitignored apm download target. `.claude/skills/` and `.agents/skills/` hold apm-deployed skill copies (currently just `submit-pr`).
+
+This repo also publishes its own skill: `skills/issue-cli/SKILL.md`. External projects install it via apm with `FukeKazki/issue-cli/skills/issue-cli` in their `apm.yml`.
