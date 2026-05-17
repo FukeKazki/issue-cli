@@ -14,6 +14,7 @@ type ListAction int
 
 const (
 	ListActionQuit ListAction = iota
+	ListActionShow
 	ListActionCheckout
 	ListActionEdit
 	ListActionCreate
@@ -171,6 +172,11 @@ func (m listModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.showPreview = !m.showPreview
 	case "enter":
 		if id := m.currentID(); id > 0 {
+			m.result = ListResult{Action: ListActionShow, IssueID: id}
+			return m, tea.Quit
+		}
+	case "c":
+		if id := m.currentID(); id > 0 {
 			m.result = ListResult{Action: ListActionCheckout, IssueID: id}
 			return m, tea.Quit
 		}
@@ -179,7 +185,7 @@ func (m listModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.result = ListResult{Action: ListActionEdit, IssueID: id}
 			return m, tea.Quit
 		}
-	case "c":
+	case "n":
 		m.result = ListResult{Action: ListActionCreate}
 		return m, tea.Quit
 	case "s":
@@ -258,7 +264,7 @@ func (m listModel) renderListPanel(w int) string {
 		if m.filterInput.Value() != "" {
 			b.WriteString(hintStyle.Render("(no issues match filter)"))
 		} else {
-			b.WriteString(hintStyle.Render("(no issues — press 'c' to create, 'q' to quit)"))
+			b.WriteString(hintStyle.Render("(no issues — press 'n' to create, 'q' to quit)"))
 		}
 		return panelStyle.Width(w).Render(b.String())
 	}
@@ -330,12 +336,13 @@ func (m listModel) renderFooter() string {
 		return footerStyle.Render("enter accept  ·  esc clear")
 	}
 	keys := []string{
-		"enter checkout",
-		"v preview",
+		"enter show",
+		"c checkout",
+		"n create",
 		"e edit",
-		"c create",
 		"s status",
 		"d delete",
+		"v preview",
 		"/ filter",
 		"q quit",
 	}

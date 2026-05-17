@@ -47,12 +47,13 @@ func usage() {
   issue create [--title TITLE]
 
 Keys in list:
-  Enter   checkout branch issue/<id>
-  v       toggle detail preview
+  Enter   show issue detail (q/Esc to return)
+  c       git checkout issue/<id>
+  n       create new issue
   e       edit issue
-  c       create new issue
   s       change status (then 1-4 or enter)
   d       delete issue (confirm)
+  v       toggle detail preview
   /       filter
   j/k     move down/up (also ↓/↑)
   q/Esc   quit

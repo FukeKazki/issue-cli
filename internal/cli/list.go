@@ -52,6 +52,10 @@ func List(args []string) error {
 		switch res.Action {
 		case tui.ListActionQuit:
 			return nil
+		case tui.ListActionShow:
+			if err := showIssue(s, res.IssueID); err != nil {
+				fmt.Fprintln(os.Stderr, "show failed:", err)
+			}
 		case tui.ListActionCheckout:
 			if res.IssueID == 0 {
 				return nil
@@ -95,6 +99,14 @@ func filterIssues(in []model.Issue, all bool, statusFilter string) []model.Issue
 		out = append(out, iss)
 	}
 	return out
+}
+
+func showIssue(s *store.Store, id int) error {
+	iss, err := s.Load(id)
+	if err != nil {
+		return err
+	}
+	return tui.RunDetailView(iss)
 }
 
 func editIssue(s *store.Store, id int) error {
