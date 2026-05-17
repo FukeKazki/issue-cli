@@ -3,7 +3,10 @@ package tui
 import (
 	"errors"
 	"fmt"
+	"os/exec"
+	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/FukeKazki/issue-cli/internal/model"
 	"github.com/charmbracelet/bubbles/textarea"
@@ -61,21 +64,32 @@ var (
 	errorStyle = lipgloss.NewStyle().Foreground(colError).Bold(true)
 )
 
+type completionState struct {
+	active   bool
+	items    []string
+	idx      int
+	row      int
+	atCol    int
+	queryEnd int
+}
+
 type formModel struct {
-	header     string
-	iss        *model.Issue
-	titleInput textinput.Model
-	descArea   textarea.Model
-	refsArea   textarea.Model
-	scopeArea  textarea.Model
-	statuses   []model.Status
-	statusIdx  int
-	focus      int
-	width      int
-	height     int
-	submitted  bool
-	canceled   bool
-	errMsg     string
+	header          string
+	iss             *model.Issue
+	titleInput      textinput.Model
+	descArea        textarea.Model
+	refsArea        textarea.Model
+	scopeArea       textarea.Model
+	statuses        []model.Status
+	statusIdx       int
+	focus           int
+	width           int
+	height          int
+	submitted       bool
+	canceled        bool
+	errMsg          string
+	repoFiles       []string
+	scopeCompletion completionState
 }
 
 func newFormModel(iss *model.Issue, header string) formModel {
@@ -138,6 +152,7 @@ func newFormModel(iss *model.Issue, header string) formModel {
 		statuses:   statuses,
 		statusIdx:  idx,
 		focus:      focusTitle,
+		repoFiles:  listRepoFiles(),
 	}
 }
 
@@ -161,6 +176,29 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.focus == focusScope && m.scopeCompletion.active {
+			switch msg.String() {
+			case "esc":
+				m.scopeCompletion.active = false
+				return m, nil
+			case "up", "ctrl+p":
+				if n := len(m.scopeCompletion.items); n > 0 {
+					m.scopeCompletion.idx = (m.scopeCompletion.idx - 1 + n) % n
+				}
+				return m, nil
+			case "down", "ctrl+n":
+				if n := len(m.scopeCompletion.items); n > 0 {
+					m.scopeCompletion.idx = (m.scopeCompletion.idx + 1) % n
+				}
+				return m, nil
+			case "tab", "enter":
+				if len(m.scopeCompletion.items) > 0 {
+					m.applyScopeCompletion()
+				}
+				m.scopeCompletion.active = false
+				return m, nil
+			}
+		}
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.canceled = true
@@ -211,6 +249,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refsArea, cmd = m.refsArea.Update(msg)
 	case focusScope:
 		m.scopeArea, cmd = m.scopeArea.Update(msg)
+		m.recomputeScopeCompletion()
 	}
 	return m, cmd
 }
@@ -236,6 +275,7 @@ func (m *formModel) applyFocus() {
 		m.scopeArea.Focus()
 	} else {
 		m.scopeArea.Blur()
+		m.scopeCompletion.active = false
 	}
 }
 
@@ -295,9 +335,13 @@ func (m formModel) renderFormPanel() string {
 
 	b.WriteString(m.fieldLabel("SCOPE", focusScope))
 	b.WriteString("  ")
-	b.WriteString(hintStyle.Render("one path per line; @ auto-prefixed"))
+	b.WriteString(hintStyle.Render("type @ to search files; one path per line"))
 	b.WriteString("\n")
 	b.WriteString(m.scopeArea.View())
+	if m.focus == focusScope && m.scopeCompletion.active {
+		b.WriteString("\n")
+		b.WriteString(m.renderScopeCompletion())
+	}
 
 	if m.errMsg != "" {
 		b.WriteString("\n\n")
@@ -381,6 +425,177 @@ func normalizeScope(items []string) []string {
 			s = "@" + s
 		}
 		out = append(out, s)
+	}
+	return out
+}
+
+const completionMaxItems = 8
+
+func (m *formModel) recomputeScopeCompletion() {
+	val := m.scopeArea.Value()
+	rows := strings.Split(val, "\n")
+	rowIdx := m.scopeArea.Line()
+	if rowIdx < 0 || rowIdx >= len(rows) {
+		m.scopeCompletion.active = false
+		return
+	}
+	li := m.scopeArea.LineInfo()
+	col := li.StartColumn + li.ColumnOffset
+	row := []rune(rows[rowIdx])
+	if col > len(row) {
+		col = len(row)
+	}
+	atCol := -1
+	for i := col - 1; i >= 0; i-- {
+		r := row[i]
+		if r == '@' {
+			atCol = i
+			break
+		}
+		if unicode.IsSpace(r) {
+			break
+		}
+	}
+	if atCol < 0 {
+		m.scopeCompletion.active = false
+		return
+	}
+	if atCol > 0 && !unicode.IsSpace(row[atCol-1]) {
+		m.scopeCompletion.active = false
+		return
+	}
+	query := string(row[atCol+1 : col])
+	items := filterRepoFiles(m.repoFiles, query)
+	prevActive := m.scopeCompletion.active
+	m.scopeCompletion.active = true
+	m.scopeCompletion.row = rowIdx
+	m.scopeCompletion.atCol = atCol
+	m.scopeCompletion.queryEnd = col
+	m.scopeCompletion.items = items
+	if !prevActive || m.scopeCompletion.idx >= len(items) {
+		m.scopeCompletion.idx = 0
+	}
+}
+
+func (m *formModel) applyScopeCompletion() {
+	if m.scopeCompletion.idx < 0 || m.scopeCompletion.idx >= len(m.scopeCompletion.items) {
+		return
+	}
+	sel := m.scopeCompletion.items[m.scopeCompletion.idx]
+	n := m.scopeCompletion.queryEnd - m.scopeCompletion.atCol
+	for i := 0; i < n; i++ {
+		m.scopeArea, _ = m.scopeArea.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	m.scopeArea.InsertString("@" + sel)
+}
+
+func (m formModel) renderScopeCompletion() string {
+	items := m.scopeCompletion.items
+	box := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(colMuted).
+		Padding(0, 1)
+	if len(items) == 0 {
+		return box.Render(hintStyle.Render("no files match"))
+	}
+	start, end := windowAround(m.scopeCompletion.idx, len(items), completionMaxItems)
+	var lines []string
+	for i := start; i < end; i++ {
+		marker := "  "
+		text := items[i]
+		if i == m.scopeCompletion.idx {
+			marker = labelFocus.Render("▸ ")
+			text = labelFocus.Render(text)
+		} else {
+			text = labelBlur.Render(text)
+		}
+		lines = append(lines, marker+text)
+	}
+	if end < len(items) {
+		lines = append(lines, hintStyle.Render(fmt.Sprintf("  +%d more", len(items)-end)))
+	}
+	lines = append(lines, hintStyle.Render("↑/↓ select • tab/enter insert • esc dismiss"))
+	return box.Render(strings.Join(lines, "\n"))
+}
+
+func windowAround(idx, total, size int) (int, int) {
+	if total <= size {
+		return 0, total
+	}
+	start := idx - size/2
+	if start < 0 {
+		start = 0
+	}
+	end := start + size
+	if end > total {
+		end = total
+		start = end - size
+	}
+	return start, end
+}
+
+func listRepoFiles() []string {
+	out, err := exec.Command("git", "ls-files", "-z").Output()
+	if err != nil {
+		return nil
+	}
+	parts := strings.Split(string(out), "\x00")
+	files := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		files = append(files, p)
+	}
+	return files
+}
+
+func filterRepoFiles(files []string, query string) []string {
+	if len(files) == 0 {
+		return nil
+	}
+	limit := 50
+	if query == "" {
+		n := len(files)
+		if n > limit {
+			n = limit
+		}
+		out := make([]string, n)
+		copy(out, files[:n])
+		return out
+	}
+	q := strings.ToLower(query)
+	type scored struct {
+		path string
+		rank int
+	}
+	var hits []scored
+	for _, f := range files {
+		lf := strings.ToLower(f)
+		switch {
+		case strings.HasPrefix(lf, q):
+			hits = append(hits, scored{f, 0})
+		case strings.Contains(lf, "/"+q):
+			hits = append(hits, scored{f, 1})
+		case strings.Contains(lf, q):
+			hits = append(hits, scored{f, 2})
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].rank != hits[j].rank {
+			return hits[i].rank < hits[j].rank
+		}
+		return hits[i].path < hits[j].path
+	})
+	if len(hits) == 0 {
+		return nil
+	}
+	if len(hits) > limit {
+		hits = hits[:limit]
+	}
+	out := make([]string, len(hits))
+	for i, h := range hits {
+		out[i] = h.path
 	}
 	return out
 }
