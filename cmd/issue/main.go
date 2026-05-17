@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/FukeKazki/issue-cli/internal/cli"
 )
@@ -30,6 +32,10 @@ func main() {
 		usage()
 		return
 	default:
+		if _, e := strconv.Atoi(strings.TrimPrefix(sub, "#")); e == nil {
+			err = cli.Show(os.Args[1:])
+			break
+		}
 		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", sub)
 		usage()
 		os.Exit(2)
@@ -43,6 +49,7 @@ func main() {
 func usage() {
 	fmt.Fprint(os.Stderr, `Usage:
   issue                                  on issue/<id>: show that issue; otherwise: open list TUI
+  issue <id> | issue #<id>               show issue detail
   issue list [--all] [--status=STATUS]
   issue create [--title TITLE]
 
