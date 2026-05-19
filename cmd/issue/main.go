@@ -26,8 +26,10 @@ func main() {
 		err = cli.List(args)
 	case "create", "new":
 		err = cli.Create(args)
-	case "_show":
+	case "show":
 		err = cli.Show(args)
+	case "next":
+		err = cli.Next(args)
 	case "edit":
 		err = cli.Edit(args)
 	case "-h", "--help", "help":
@@ -52,7 +54,9 @@ func usage() {
 	fmt.Fprint(os.Stderr, `Usage:
   issue                                  on issue/<id>: show that issue; otherwise: open list TUI
   issue <id> | issue #<id>               show issue detail
-  issue list [--all] [--status=STATUS]
+  issue show <id> [--format markdown|yaml|json]
+  issue list [--all] [--status=STATUS] [--format json]
+  issue next [--format json]             print the next TODO issue as JSON ({"issue": null} if none)
   issue create [--title TITLE]
   issue edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
 

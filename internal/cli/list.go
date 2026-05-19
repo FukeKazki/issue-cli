@@ -9,6 +9,7 @@ import (
 
 	"github.com/FukeKazki/issue-cli/internal/gitx"
 	"github.com/FukeKazki/issue-cli/internal/model"
+	"github.com/FukeKazki/issue-cli/internal/output"
 	"github.com/FukeKazki/issue-cli/internal/store"
 	"github.com/FukeKazki/issue-cli/internal/tui"
 )
@@ -17,6 +18,7 @@ func List(args []string) error {
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	all := fs.Bool("all", false, "include Done issues")
 	statusFilter := fs.String("status", "", "filter by status (TODO|In Progress|Reviews|Done)")
+	formatFlag := fs.String("format", "", "non-interactive output format (json); omit to open the TUI")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -24,6 +26,10 @@ func List(args []string) error {
 	s, err := store.New()
 	if err != nil {
 		return err
+	}
+
+	if *formatFlag != "" {
+		return runListFormatted(s, *all, *statusFilter, *formatFlag)
 	}
 
 	lastID := 0
@@ -87,6 +93,22 @@ func List(args []string) error {
 			}
 		}
 	}
+}
+
+// runListFormatted is the non-interactive path taken when `--format` is set.
+// It applies the same filters as the TUI path and renders the resulting
+// slice via internal/output, then returns without ever opening the TUI loop.
+func runListFormatted(s *store.Store, all bool, statusFilter, formatRaw string) error {
+	f, err := output.ParseFormat(formatRaw)
+	if err != nil {
+		return err
+	}
+	issues, err := s.LoadAll()
+	if err != nil {
+		return err
+	}
+	issues = filterIssues(issues, all, statusFilter)
+	return output.WriteIssues(os.Stdout, issues, f)
 }
 
 func filterIssues(in []model.Issue, all bool, statusFilter string) []model.Issue {
