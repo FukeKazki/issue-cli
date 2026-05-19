@@ -3,9 +3,7 @@ version: 1.0.0
 description: APM project for issue
 author: FukeKazki
 dependencies:
-  apm: [
-    yoshinani-dev/skills/skills/submit-pr
-  ]
+  apm: []
   mcp: []
 includes: auto
 scripts: {}
