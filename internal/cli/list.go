@@ -117,7 +117,7 @@ func editIssue(s *store.Store, id int) error {
 	if err != nil {
 		return err
 	}
-	if err := tui.RunForm(iss, "Edit Issue"); err != nil {
+	if err := tui.RunForm(iss, "Edit Issue", false); err != nil {
 		if errors.Is(err, tui.ErrCanceled) {
 			return nil
 		}
@@ -184,7 +184,7 @@ func createFromList(s *store.Store) (int, error) {
 		return 0, err
 	}
 	iss := &model.Issue{ID: id, Status: model.StatusTODO}
-	if err := tui.RunForm(iss, "Create Issue"); err != nil {
+	if err := tui.RunForm(iss, "Create Issue", true); err != nil {
 		if errors.Is(err, tui.ErrCanceled) {
 			return 0, nil
 		}

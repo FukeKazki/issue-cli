@@ -3,6 +3,8 @@ package tui
 import (
 	"reflect"
 	"testing"
+
+	"github.com/FukeKazki/issue-cli/internal/model"
 )
 
 func TestFilterRepoFiles(t *testing.T) {
@@ -79,6 +81,133 @@ func TestWrappedLineCount(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := wrappedLineCount(tc.value, tc.width); got != tc.want {
 				t.Errorf("wrappedLineCount(%q, %d) = %d, want %d", tc.value, tc.width, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestIsDirty(t *testing.T) {
+	tests := []struct {
+		name   string
+		iss    model.Issue
+		mutate func(m *formModel)
+		want   bool
+	}{
+		{
+			name: "create initial state is clean",
+			iss:  model.Issue{Status: model.StatusTODO},
+			want: false,
+		},
+		{
+			name: "title typed is dirty",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.titleInput.SetValue("hello")
+			},
+			want: true,
+		},
+		{
+			name: "title whitespace only is clean",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.titleInput.SetValue("   ")
+			},
+			want: false,
+		},
+		{
+			name: "description typed is dirty",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.descArea.SetValue("body")
+			},
+			want: true,
+		},
+		{
+			name: "description trailing newline only is clean",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.descArea.SetValue("\n")
+			},
+			want: false,
+		},
+		{
+			name: "references typed is dirty",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.refsArea.SetValue("https://example.com")
+			},
+			want: true,
+		},
+		{
+			name: "scope typed is dirty",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.scopeArea.SetValue("@cmd/issue/main.go")
+			},
+			want: true,
+		},
+		{
+			name: "status changed from initial is dirty",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.statusIdx = (m.statusIdx + 1) % len(m.statuses)
+			},
+			want: true,
+		},
+		{
+			name: "edit scenario with unchanged values is clean",
+			iss: model.Issue{
+				Title:       "existing",
+				Status:      model.StatusInProgress,
+				Description: "body",
+				References:  []string{"https://example.com"},
+				Scope:       []string{"@cmd/issue/main.go"},
+			},
+			want: false,
+		},
+		{
+			name: "edit scenario with mutated title is dirty",
+			iss: model.Issue{
+				Title:  "existing",
+				Status: model.StatusInProgress,
+			},
+			mutate: func(m *formModel) {
+				m.titleInput.SetValue("updated")
+			},
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			iss := tc.iss
+			fm := newFormModel(&iss, "test")
+			if tc.mutate != nil {
+				tc.mutate(&fm)
+			}
+			if got := fm.isDirty(); got != tc.want {
+				t.Errorf("isDirty() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestStringSliceEqual(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b []string
+		want bool
+	}{
+		{"both nil", nil, nil, true},
+		{"nil vs empty", nil, []string{}, true},
+		{"same elements", []string{"a", "b"}, []string{"a", "b"}, true},
+		{"different lengths", []string{"a"}, []string{"a", "b"}, false},
+		{"different elements", []string{"a"}, []string{"b"}, false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := stringSliceEqual(tc.a, tc.b); got != tc.want {
+				t.Errorf("stringSliceEqual(%v, %v) = %v, want %v", tc.a, tc.b, got, tc.want)
 			}
 		})
 	}

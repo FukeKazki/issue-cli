@@ -35,7 +35,7 @@ func Create(args []string) error {
 			return errors.New("--title must not be empty")
 		}
 	} else {
-		if err := tui.RunForm(iss, "Create Issue"); err != nil {
+		if err := tui.RunForm(iss, "Create Issue", true); err != nil {
 			if errors.Is(err, tui.ErrCanceled) {
 				fmt.Fprintln(os.Stderr, "canceled")
 				return nil
