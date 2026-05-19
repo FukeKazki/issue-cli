@@ -1,6 +1,9 @@
 package model
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Status string
 
@@ -24,6 +27,23 @@ func ParseStatus(s string) (Status, bool) {
 		if string(v) == s {
 			return v, true
 		}
+	}
+	return "", false
+}
+
+// ParseStatusFromCLI normalizes a user-supplied CLI argument to a canonical Status.
+// Accepts case-insensitive aliases so `DONE`, `in-progress`, `review` etc. work
+// without shell-quoting the canonical `In Progress` spelling.
+func ParseStatusFromCLI(s string) (Status, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "todo":
+		return StatusTODO, true
+	case "in progress", "in-progress", "in_progress", "inprogress":
+		return StatusInProgress, true
+	case "reviews", "review":
+		return StatusReviews, true
+	case "done":
+		return StatusDone, true
 	}
 	return "", false
 }

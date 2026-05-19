@@ -25,6 +25,7 @@ Requires `git` on `PATH`.
 issue                                  # show the issue for the current issue/<id> branch, or open the list TUI
 issue list [--all] [--status=STATUS]
 issue create [--title TITLE]
+issue edit <id> --status STATUS        # update an issue's status from the CLI (case-insensitive)
 ```
 
 ### `issue` (no args)
@@ -62,6 +63,29 @@ Filters: `--all` includes Done, `--status="In Progress"` filters by one status.
 
 Without args → opens TUI form (title / status / references / scope).
 With `--title "..."` → creates with that title, status `TODO`, no references/scope.
+
+### `issue edit`
+
+Non-interactive status update. The change is allowed in any direction (the
+forward-only rule only applies to event-driven auto-transitions like `c`
+checkout).
+
+```sh
+issue edit 13 --status DONE
+issue edit #13 --status done
+issue edit 13 --status in-progress
+```
+
+Accepted `--status` values (case-insensitive):
+
+| Canonical     | Aliases                                            |
+| ------------- | -------------------------------------------------- |
+| `TODO`        | `todo`                                             |
+| `In Progress` | `in progress`, `in-progress`, `in_progress`, `inprogress` |
+| `Reviews`     | `reviews`, `review`                                |
+| `Done`        | `done`                                             |
+
+`--status` is required. Unknown values exit non-zero without touching the YAML.
 
 ## Storage
 
