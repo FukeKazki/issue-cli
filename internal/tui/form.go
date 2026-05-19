@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 // ErrCanceled is returned by RunForm when the user aborts with Esc/Ctrl+C.
@@ -110,6 +111,7 @@ func newFormModel(iss *model.Issue, header string) formModel {
 	desc.SetHeight(descAreaHeight)
 	desc.CharLimit = 0
 	desc.Blur()
+	fitDescHeight(&desc)
 
 	refs := textarea.New()
 	refs.Placeholder = "https://example.com"
@@ -173,6 +175,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.descArea.SetWidth(fw)
 		m.refsArea.SetWidth(fw)
 		m.scopeArea.SetWidth(fw)
+		fitDescHeight(&m.descArea)
 		return m, nil
 
 	case tea.KeyMsg:
@@ -245,6 +248,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.titleInput, cmd = m.titleInput.Update(msg)
 	case focusDescription:
 		m.descArea, cmd = m.descArea.Update(msg)
+		fitDescHeight(&m.descArea)
 	case focusRefs:
 		m.refsArea, cmd = m.refsArea.Update(msg)
 	case focusScope:
@@ -252,6 +256,36 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.recomputeScopeCompletion()
 	}
 	return m, cmd
+}
+
+// fitDescHeight grows the description textarea to fit its current content,
+// so long descriptions are fully visible instead of scrolling inside a
+// fixed-height viewport. The height never drops below descAreaHeight.
+func fitDescHeight(ta *textarea.Model) {
+	rows := wrappedLineCount(ta.Value(), ta.Width())
+	if rows < descAreaHeight {
+		rows = descAreaHeight
+	}
+	ta.SetHeight(rows)
+}
+
+func wrappedLineCount(s string, width int) int {
+	if width <= 0 {
+		return 1
+	}
+	rows := 0
+	for _, line := range strings.Split(s, "\n") {
+		w := runewidth.StringWidth(line)
+		if w == 0 {
+			rows++
+			continue
+		}
+		rows += (w + width - 1) / width
+	}
+	if rows < 1 {
+		rows = 1
+	}
+	return rows
 }
 
 func (m *formModel) applyFocus() {
