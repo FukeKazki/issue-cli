@@ -28,8 +28,8 @@ func main() {
 		err = cli.Create(args)
 	case "_show":
 		err = cli.Show(args)
-	case "sync":
-		err = cli.Sync(args)
+	case "edit":
+		err = cli.Edit(args)
 	case "-h", "--help", "help":
 		usage()
 		return
@@ -54,7 +54,7 @@ func usage() {
   issue <id> | issue #<id>               show issue detail
   issue list [--all] [--status=STATUS]
   issue create [--title TITLE]
-  issue sync [<id>]                      reconcile status from gh PR state (open→Reviews, merged→Done)
+  issue edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
 
 Keys in list:
   Enter   show issue detail (q/Esc to return)

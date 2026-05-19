@@ -17,9 +17,10 @@ description: ローカルIssueをissue-cliで管理する。タスクをIssue化
 ## 使えるコマンド (非対話)
 
 ```sh
-issue create --title "<タイトル>"   # status=TODO で新規作成 (IDは max(existing)+1 を採番)
-issue _show <id>                    # 詳細を標準出力にプリント
-issue                               # issue/<id> ブランチ上なら詳細を表示、それ以外はTUI起動
+issue create --title "<タイトル>"        # status=TODO で新規作成 (IDは max(existing)+1 を採番)
+issue _show <id>                         # 詳細を標準出力にプリント
+issue edit <id> --status <STATUS>        # ステータスを更新 (大文字小文字不問。done/in-progress/review なども可)
+issue                                    # issue/<id> ブランチ上なら詳細を表示、それ以外はTUI起動
 ```
 
 `issue list` や引数なしの `issue create` は対話TUIを起動するため、Claudeからは呼ばない。
@@ -62,4 +63,4 @@ for f in .issues/*.yaml; do
 done
 ```
 
-ステータス変更は対象YAMLの `status:` 行 (および `updated_at:`) を書き換える。CLI経由の更新はTUI (`s` キー) のみなので、Claudeから一括変更するときはファイル編集が早い。
+ステータス変更は `issue edit <id> --status <STATUS>` (非対話) もしくは TUI の `s` キーで行える。複数件を一括で書き換える場合は対象YAMLの `status:` 行 (および `updated_at:`) を直接編集するのが早い。
