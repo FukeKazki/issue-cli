@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 )
 
 type ListAction int
@@ -300,11 +301,19 @@ func (m listModel) renderListPanel(w int) string {
 	for i := top; i < end; i++ {
 		iss := m.issues[m.filtered[i]]
 		idCol := fmt.Sprintf("#%d", iss.ID)
+		badgeText := fmt.Sprintf("[%s]", iss.Status)
 		statusBadge := lipgloss.NewStyle().
 			Foreground(statusColor[iss.Status]).
 			Bold(true).
-			Render(fmt.Sprintf("[%s]", iss.Status))
-		raw := fmt.Sprintf("%-5s %s  %s", idCol, statusBadge, iss.Title)
+			Render(badgeText)
+		// 行構成: prefix(2) + idCol(5) + 半角空白(1) + statusBadge + 半角空白(2) + title
+		// パネル幅を超えて折り返さないよう、title 側を表示幅で切り詰める。
+		titleSpace := innerW - 2 - 5 - 1 - runewidth.StringWidth(badgeText) - 2
+		if titleSpace < 1 {
+			titleSpace = 1
+		}
+		displayTitle := truncateDisplay(iss.Title, titleSpace)
+		raw := fmt.Sprintf("%-5s %s  %s", idCol, statusBadge, displayTitle)
 		prefix := "  "
 		line := raw
 		if i == m.cursor {
@@ -329,6 +338,21 @@ func (m listModel) renderPreviewPanel(w int) string {
 		body += hintStyle.Render("(no selection)")
 	}
 	return panelStyle.Width(w).Render(body)
+}
+
+// truncateDisplay は表示幅 max を超える文字列を末尾 "..." 付きで切り詰める。
+// max <= 3 のときは ellipsis を入れる余裕がないので素朴に切り詰める。
+func truncateDisplay(s string, max int) string {
+	if max <= 0 {
+		return ""
+	}
+	if runewidth.StringWidth(s) <= max {
+		return s
+	}
+	if max <= 3 {
+		return runewidth.Truncate(s, max, "")
+	}
+	return runewidth.Truncate(s, max, "...")
 }
 
 func (m listModel) renderFooter() string {
