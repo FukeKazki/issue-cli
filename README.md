@@ -23,7 +23,9 @@ Requires `git` on `PATH`.
 
 ```
 issue                                  # show the issue for the current issue/<id> branch, or open the list TUI
-issue list [--all] [--status=STATUS]
+issue show <id> [--format markdown|yaml|json]
+issue list [--all] [--status=STATUS] [--format json]
+issue next [--format json]             # next actionable TODO issue, for automation
 issue create [--title TITLE]
 issue edit <id> --status STATUS        # update an issue's status from the CLI (case-insensitive)
 ```
@@ -86,6 +88,28 @@ Accepted `--status` values (case-insensitive):
 | `Done`        | `done`                                             |
 
 `--status` is required. Unknown values exit non-zero without touching the YAML.
+
+## Automation / machine-readable output
+
+For piping into runners like
+[`simple-takt`](https://github.com/FukeKazki/simple-takt), non-interactive
+subcommands emit structured output instead of opening the TUI. The existing
+TUI behavior is unchanged — these flags only activate when supplied.
+
+| Command                                          | Output                                                                  |
+| ------------------------------------------------ | ----------------------------------------------------------------------- |
+| `issue show <id> --format markdown\|yaml\|json`  | one issue; non-zero exit if the id is missing or unknown                |
+| `issue list --format json [--status STATUS]`     | JSON array of issues (after the same `--all` / `--status` filter)       |
+| `issue next [--format json]`                     | envelope `{"issue": {...}}`, or `{"issue": null}` when no TODO remains  |
+
+`issue next` picks the lowest-id `TODO` issue (deterministic) and always
+exits 0 so downstream pipes always receive valid JSON.
+
+Pipe into simple-takt:
+
+```sh
+issue next --format json | simple-takt -w issue-dev
+```
 
 ## Storage
 
