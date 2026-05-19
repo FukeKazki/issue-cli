@@ -58,6 +58,32 @@ func TestFilterRepoFiles(t *testing.T) {
 	}
 }
 
+func TestWrappedLineCount(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		width int
+		want  int
+	}{
+		{"empty value renders one row", "", 40, 1},
+		{"single short line", "hello", 40, 1},
+		{"wraps at width boundary", "abcdefghij", 5, 2},
+		{"wraps with remainder", "abcdefghijk", 5, 3},
+		{"newlines counted as separate lines", "a\nb\nc", 40, 3},
+		{"blank line counts as one row", "a\n\nb", 40, 3},
+		{"long line plus short line", "abcdefghij\nshort", 5, 3},
+		{"width<=0 falls back to one row", "anything", 0, 1},
+		{"east-asian width counts as 2", "あいう", 4, 2},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := wrappedLineCount(tc.value, tc.width); got != tc.want {
+				t.Errorf("wrappedLineCount(%q, %d) = %d, want %d", tc.value, tc.width, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestWindowAround(t *testing.T) {
 	tests := []struct {
 		name              string
