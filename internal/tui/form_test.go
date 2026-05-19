@@ -11,7 +11,7 @@ func TestFilterRepoFiles(t *testing.T) {
 	files := []string{
 		"README.md",
 		"cmd/issue/main.go",
-		"internal/cli/create.go",
+		"internal/cli/new.go",
 		"internal/cli/list.go",
 		"internal/store/store.go",
 		"internal/tui/form.go",

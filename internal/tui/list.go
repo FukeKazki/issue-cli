@@ -18,7 +18,7 @@ const (
 	ListActionShow
 	ListActionCheckout
 	ListActionEdit
-	ListActionCreate
+	ListActionNew
 	ListActionStatus
 	ListActionDelete
 )
@@ -187,7 +187,7 @@ func (m listModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 	case "n":
-		m.result = ListResult{Action: ListActionCreate}
+		m.result = ListResult{Action: ListActionNew}
 		return m, tea.Quit
 	case "s":
 		if id := m.currentID(); id > 0 {
@@ -362,7 +362,7 @@ func (m listModel) renderFooter() string {
 	keys := []string{
 		"enter show",
 		"c checkout",
-		"n create",
+		"n new",
 		"e edit",
 		"s status",
 		"d delete",
