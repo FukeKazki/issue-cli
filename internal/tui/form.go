@@ -75,22 +75,24 @@ type completionState struct {
 }
 
 type formModel struct {
-	header          string
-	iss             *model.Issue
-	titleInput      textinput.Model
-	descArea        textarea.Model
-	refsArea        textarea.Model
-	scopeArea       textarea.Model
-	statuses        []model.Status
-	statusIdx       int
-	focus           int
-	width           int
-	height          int
-	submitted       bool
-	canceled        bool
-	errMsg          string
-	repoFiles       []string
-	scopeCompletion completionState
+	header                string
+	iss                   *model.Issue
+	titleInput            textinput.Model
+	descArea              textarea.Model
+	refsArea              textarea.Model
+	scopeArea             textarea.Model
+	statuses              []model.Status
+	statusIdx             int
+	focus                 int
+	width                 int
+	height                int
+	submitted             bool
+	canceled              bool
+	errMsg                string
+	repoFiles             []string
+	scopeCompletion       completionState
+	confirmOnCancel       bool
+	awaitingCancelConfirm bool
 }
 
 func newFormModel(iss *model.Issue, header string) formModel {
@@ -179,6 +181,20 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
+		if m.awaitingCancelConfirm {
+			switch msg.String() {
+			case "ctrl+c":
+				m.canceled = true
+				return m, tea.Quit
+			case "y", "Y", "enter":
+				m.canceled = true
+				return m, tea.Quit
+			case "n", "N", "esc":
+				m.awaitingCancelConfirm = false
+				return m, nil
+			}
+			return m, nil
+		}
 		if m.focus == focusScope && m.scopeCompletion.active {
 			switch msg.String() {
 			case "esc":
@@ -203,7 +219,14 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 		switch msg.String() {
-		case "ctrl+c", "esc":
+		case "ctrl+c":
+			m.canceled = true
+			return m, tea.Quit
+		case "esc":
+			if m.confirmOnCancel && m.isDirty() {
+				m.awaitingCancelConfirm = true
+				return m, nil
+			}
 			m.canceled = true
 			return m, tea.Quit
 		case "ctrl+s":
@@ -314,7 +337,47 @@ func (m *formModel) applyFocus() {
 }
 
 func (m formModel) View() string {
-	return m.renderFormPanel() + "\n" + m.renderFooter()
+	panel := m.renderFormPanel()
+	if m.awaitingCancelConfirm {
+		prompt := errorStyle.Render("Discard your changes?") + " " +
+			footerStyle.Render("(y/Enter: discard, n/Esc: back)")
+		return panel + "\n\n" + prompt
+	}
+	return panel + "\n" + m.renderFooter()
+}
+
+// isDirty reports whether the form's current values differ from the initial
+// issue. Comparisons mirror the normalization in RunForm so that whitespace-
+// only edits do not count as changes.
+func (m formModel) isDirty() bool {
+	if strings.TrimSpace(m.titleInput.Value()) != m.iss.Title {
+		return true
+	}
+	if m.statuses[m.statusIdx] != m.iss.Status {
+		return true
+	}
+	if strings.TrimRight(m.descArea.Value(), "\n") != m.iss.Description {
+		return true
+	}
+	if !stringSliceEqual(splitLines(m.refsArea.Value()), m.iss.References) {
+		return true
+	}
+	if !stringSliceEqual(normalizeScope(splitLines(m.scopeArea.Value())), m.iss.Scope) {
+		return true
+	}
+	return false
+}
+
+func stringSliceEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func (m formModel) formColWidth() int {
@@ -422,8 +485,9 @@ func (m formModel) renderFooter() string {
 	return footerStyle.Render(strings.Join(keys, "  •  "))
 }
 
-func RunForm(iss *model.Issue, header string) error {
+func RunForm(iss *model.Issue, header string, confirmOnCancel bool) error {
 	m := newFormModel(iss, header)
+	m.confirmOnCancel = confirmOnCancel
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
