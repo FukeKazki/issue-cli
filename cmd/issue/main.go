@@ -32,6 +32,8 @@ func main() {
 		err = cli.Next(args)
 	case "edit":
 		err = cli.Edit(args)
+	case "metadata", "meta":
+		err = cli.Metadata(args)
 	case "-h", "--help", "help":
 		usage()
 		return
@@ -59,6 +61,10 @@ func usage() {
   issue next [--format json]             print the next TODO issue as JSON ({"issue": null} if none)
   issue create [--title TITLE]
   issue edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
+  issue metadata <id>                    show free-form metadata attached to an issue
+  issue metadata set <id> k=v [k=v ...]  merge key/value pairs into the issue's metadata map
+  issue metadata unset <id> k [k ...]    remove keys from the metadata map
+  issue metadata clear <id>              drop the entire metadata map
 
 Keys in list:
   Enter   show issue detail (q/Esc to return)

@@ -28,6 +28,10 @@ issue list [--all] [--status=STATUS] [--format json]
 issue next [--format json]             # next actionable TODO issue, for automation
 issue create [--title TITLE]
 issue edit <id> --status STATUS        # update an issue's status from the CLI (case-insensitive)
+issue metadata <id>                    # show free-form metadata attached to an issue
+issue metadata set <id> k=v [k=v ...]  # merge key/value pairs into the issue's metadata map
+issue metadata unset <id> k [k ...]    # remove named keys
+issue metadata clear <id>              # drop the entire metadata map
 ```
 
 ### `issue` (no args)
@@ -89,6 +93,33 @@ Accepted `--status` values (case-insensitive):
 
 `--status` is required. Unknown values exit non-zero without touching the YAML.
 
+### `issue metadata`
+
+Free-form key/value attributes on the issue. The CLI does not interpret keys
+or values — automation runners, scripts, or humans can attach whatever
+context they need (workflow id, run id, PR url, timing, etc.) without the
+CLI hard-coding a schema.
+
+```sh
+issue metadata 13                                                    # show
+issue metadata set 13 workflow=issue-dev run-id=20260520-abc         # merge
+issue metadata set 13 result=success pr-url=https://github.com/.../42
+issue metadata unset 13 error                                        # drop a key
+issue metadata clear 13                                              # drop all
+```
+
+`set` merges into the existing map (same-key entries are overwritten). `unset`
+removes the named keys; when the map becomes empty it is dropped entirely so
+the `metadata:` block does not linger in the YAML. Values are strings — the
+CLI does not parse timestamps or numbers, callers are responsible for the
+format they store. All subcommands accept `--format json|yaml|markdown` to
+emit the updated issue instead of the plain-text summary.
+
+Status transitions remain the job of `issue edit --status`; `metadata`
+only touches the metadata map. If a runner needs an atomic
+check-and-write, it should `issue edit --status "In Progress"` (which fails
+loudly if the YAML moved underneath it) and then `issue metadata set`.
+
 ## Automation / machine-readable output
 
 For piping into runners like
@@ -101,6 +132,7 @@ TUI behavior is unchanged — these flags only activate when supplied.
 | `issue show <id> --format markdown\|yaml\|json`  | one issue; non-zero exit if the id is missing or unknown                |
 | `issue list --format json [--status STATUS]`     | JSON array of issues (after the same `--all` / `--status` filter)       |
 | `issue next [--format json]`                     | envelope `{"issue": {...}}`, or `{"issue": null}` when no TODO remains  |
+| `issue metadata <subcmd> <id> ... --format json` | the updated issue (post-mutation) as a single JSON object               |
 
 `issue next` picks the lowest-id `TODO` issue (deterministic) and always
 exits 0 so downstream pipes always receive valid JSON.
@@ -125,9 +157,17 @@ references:
   - https://example.com/spec
 scope:
   - "@apps/web/hoge.tsx"
+metadata:                      # optional; free-form string key/value pairs
+  workflow: issue-dev          # any keys callers choose — the CLI does not interpret them
+  run-id: 20260520-abc
+  pr-url: https://github.com/owner/repo/pull/42
 created_at: 2026-05-16T10:30:00+09:00
 updated_at: 2026-05-16T10:30:00+09:00
 ```
+
+Issues with no metadata omit the `metadata:` block entirely — it is written
+lazily by `issue metadata set` and dropped again when `unset` removes the
+last key.
 
 IDs are assigned as `max(existing)+1`. Whether `.issues/` is committed to git
 is up to you — the CLI doesn't touch `.gitignore`.

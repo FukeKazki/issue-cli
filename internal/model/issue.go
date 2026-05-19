@@ -60,14 +60,15 @@ func StatusRank(s Status) int {
 }
 
 type Issue struct {
-	ID          int       `yaml:"id" json:"id"`
-	Title       string    `yaml:"title" json:"title"`
-	Status      Status    `yaml:"status" json:"status"`
-	Description string    `yaml:"description" json:"description"`
-	References  []string  `yaml:"references" json:"references"`
-	Scope       []string  `yaml:"scope" json:"scope"`
-	CreatedAt   time.Time `yaml:"created_at" json:"created_at"`
-	UpdatedAt   time.Time `yaml:"updated_at" json:"updated_at"`
+	ID          int               `yaml:"id" json:"id"`
+	Title       string            `yaml:"title" json:"title"`
+	Status      Status            `yaml:"status" json:"status"`
+	Description string            `yaml:"description" json:"description"`
+	References  []string          `yaml:"references" json:"references"`
+	Scope       []string          `yaml:"scope" json:"scope"`
+	Metadata    map[string]string `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	CreatedAt   time.Time         `yaml:"created_at" json:"created_at"`
+	UpdatedAt   time.Time         `yaml:"updated_at" json:"updated_at"`
 }
 
 func (i *Issue) IsOpen() bool {
