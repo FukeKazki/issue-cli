@@ -60,59 +60,15 @@ func StatusRank(s Status) int {
 }
 
 type Issue struct {
-	ID          int       `yaml:"id" json:"id"`
-	Title       string    `yaml:"title" json:"title"`
-	Status      Status    `yaml:"status" json:"status"`
-	Description string    `yaml:"description" json:"description"`
-	References  []string  `yaml:"references" json:"references"`
-	Scope       []string  `yaml:"scope" json:"scope"`
-	Run         *Run      `yaml:"run,omitempty" json:"run,omitempty"`
-	CreatedAt   time.Time `yaml:"created_at" json:"created_at"`
-	UpdatedAt   time.Time `yaml:"updated_at" json:"updated_at"`
-}
-
-// RunResult is the terminal outcome of a workflow execution recorded against
-// an issue. Canonical values are lowercase to match the YAML on disk; use
-// ParseRunResult to normalize CLI input.
-type RunResult string
-
-const (
-	RunResultSuccess     RunResult = "success"
-	RunResultFailure     RunResult = "failure"
-	RunResultInterrupted RunResult = "interrupted"
-)
-
-// Run holds metadata for the most recent workflow execution against the
-// issue. All fields are optional so a hand-managed issue (or an issue that
-// has never been claimed) can omit the block entirely — `Issue.Run` is a
-// pointer so a nil run is dropped from the YAML output via `omitempty`.
-//
-// `claim` populates Workflow / ID / StartedAt; `release` populates
-// FinishedAt / Result / Error / PRURL. A fresh claim overwrites the previous
-// Run (the field reflects the most recent execution, not a history).
-type Run struct {
-	Workflow   string    `yaml:"workflow,omitempty" json:"workflow,omitempty"`
-	ID         string    `yaml:"id,omitempty" json:"id,omitempty"`
-	StartedAt  time.Time `yaml:"started_at,omitempty" json:"started_at,omitempty"`
-	FinishedAt time.Time `yaml:"finished_at,omitempty" json:"finished_at,omitempty"`
-	Result     RunResult `yaml:"result,omitempty" json:"result,omitempty"`
-	Error      string    `yaml:"error,omitempty" json:"error,omitempty"`
-	PRURL      string    `yaml:"pr_url,omitempty" json:"pr_url,omitempty"`
-}
-
-// ParseRunResult normalizes a user-supplied CLI value to a canonical
-// RunResult (case-insensitive; whitespace-trimmed). Returns false for empty
-// or unknown values so callers can surface a friendly error.
-func ParseRunResult(s string) (RunResult, bool) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "success":
-		return RunResultSuccess, true
-	case "failure":
-		return RunResultFailure, true
-	case "interrupted":
-		return RunResultInterrupted, true
-	}
-	return "", false
+	ID          int               `yaml:"id" json:"id"`
+	Title       string            `yaml:"title" json:"title"`
+	Status      Status            `yaml:"status" json:"status"`
+	Description string            `yaml:"description" json:"description"`
+	References  []string          `yaml:"references" json:"references"`
+	Scope       []string          `yaml:"scope" json:"scope"`
+	Metadata    map[string]string `yaml:"metadata,omitempty" json:"metadata,omitempty"`
+	CreatedAt   time.Time         `yaml:"created_at" json:"created_at"`
+	UpdatedAt   time.Time         `yaml:"updated_at" json:"updated_at"`
 }
 
 func (i *Issue) IsOpen() bool {

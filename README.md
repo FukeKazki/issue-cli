@@ -28,8 +28,10 @@ issue list [--all] [--status=STATUS] [--format json]
 issue next [--format json]             # next actionable TODO issue, for automation
 issue create [--title TITLE]
 issue edit <id> --status STATUS        # update an issue's status from the CLI (case-insensitive)
-issue claim <id> [--workflow NAME] [--run-id ID] [--force] [--format json]
-issue release <id> --result success|failure|interrupted [--error MSG] [--pr-url URL] [--format json]
+issue metadata <id>                    # show free-form metadata attached to an issue
+issue metadata set <id> k=v [k=v ...]  # merge key/value pairs into the issue's metadata map
+issue metadata unset <id> k [k ...]    # remove named keys
+issue metadata clear <id>              # drop the entire metadata map
 ```
 
 ### `issue` (no args)
@@ -91,38 +93,32 @@ Accepted `--status` values (case-insensitive):
 
 `--status` is required. Unknown values exit non-zero without touching the YAML.
 
-### `issue claim` / `issue release`
+### `issue metadata`
 
-Non-interactive entry points for automation runners (e.g.
-[`simple-takt`](https://github.com/FukeKazki/simple-takt)) that need to
-reserve an issue before working on it and stamp the outcome when finished.
+Free-form key/value attributes on the issue. The CLI does not interpret keys
+or values — automation runners, scripts, or humans can attach whatever
+context they need (workflow id, run id, PR url, timing, etc.) without the
+CLI hard-coding a schema.
 
 ```sh
-issue claim 13 --workflow issue-dev --run-id 20260520-abc
-issue release 13 --result success --pr-url https://github.com/owner/repo/pull/42
-issue release 13 --result failure --error "go test failed"
+issue metadata 13                                                    # show
+issue metadata set 13 workflow=issue-dev run-id=20260520-abc         # merge
+issue metadata set 13 result=success pr-url=https://github.com/.../42
+issue metadata unset 13 error                                        # drop a key
+issue metadata clear 13                                              # drop all
 ```
 
-`claim` transitions a `TODO` issue to `In Progress` and writes a `run:` block
-on the YAML capturing `workflow`, `id`, and `started_at`. If the issue is
-already in any non-`TODO` state, `claim` fails without touching the file so a
-concurrent runner sees the conflict:
+`set` merges into the existing map (same-key entries are overwritten). `unset`
+removes the named keys; when the map becomes empty it is dropped entirely so
+the `metadata:` block does not linger in the YAML. Values are strings — the
+CLI does not parse timestamps or numbers, callers are responsible for the
+format they store. All subcommands accept `--format json|yaml|markdown` to
+emit the updated issue instead of the plain-text summary.
 
-```
-error: issue #13 is already In Progress (workflow=issue-dev, run-id=20260519-prev); pass --force to override
-```
-
-`--force` overrides the guard (the use case is a manual re-run or recovery
-after a crashed runner) and replaces the previous `run:` block. The previous
-Run is intentionally overwritten — `Issue.Run` reflects the most recent
-execution, not a history.
-
-`release` stamps `finished_at`, `result`, and the optional `error` / `pr_url`
-on the same `run:` block. It does NOT change `status` — that remains the
-job of `issue edit --status` so the success/failure decision is independent
-from the workflow-state decision. `release` works even when no prior `claim`
-exists (it allocates an empty `run:` block first); title, description,
-references, and scope are preserved across the round-trip.
+Status transitions remain the job of `issue edit --status`; `metadata`
+only touches the metadata map. If a runner needs an atomic
+check-and-write, it should `issue edit --status "In Progress"` (which fails
+loudly if the YAML moved underneath it) and then `issue metadata set`.
 
 ## Automation / machine-readable output
 
@@ -136,8 +132,7 @@ TUI behavior is unchanged — these flags only activate when supplied.
 | `issue show <id> --format markdown\|yaml\|json`  | one issue; non-zero exit if the id is missing or unknown                |
 | `issue list --format json [--status STATUS]`     | JSON array of issues (after the same `--all` / `--status` filter)       |
 | `issue next [--format json]`                     | envelope `{"issue": {...}}`, or `{"issue": null}` when no TODO remains  |
-| `issue claim <id> ... --format json`             | the updated issue (post-claim) as a single JSON object                  |
-| `issue release <id> ... --format json`           | the updated issue (post-release) as a single JSON object                |
+| `issue metadata <subcmd> <id> ... --format json` | the updated issue (post-mutation) as a single JSON object               |
 
 `issue next` picks the lowest-id `TODO` issue (deterministic) and always
 exits 0 so downstream pipes always receive valid JSON.
@@ -162,20 +157,17 @@ references:
   - https://example.com/spec
 scope:
   - "@apps/web/hoge.tsx"
-run:                           # optional; written by `issue claim` / `issue release`
-  workflow: issue-dev          # workflow name passed to `claim --workflow`
-  id: 20260520-abc             # run identifier passed to `claim --run-id`
-  started_at: 2026-05-20T10:30:00+09:00
-  finished_at: 2026-05-20T10:45:12+09:00   # set by `release`
-  result: success              # success | failure | interrupted (set by `release`)
-  error: ""                    # short summary, populated on failure/interrupted
-  pr_url: https://github.com/owner/repo/pull/42
+metadata:                      # optional; free-form string key/value pairs
+  workflow: issue-dev          # any keys callers choose — the CLI does not interpret them
+  run-id: 20260520-abc
+  pr-url: https://github.com/owner/repo/pull/42
 created_at: 2026-05-16T10:30:00+09:00
 updated_at: 2026-05-16T10:30:00+09:00
 ```
 
-Issues that have never been claimed omit the `run:` block entirely — it is
-written lazily on the first `claim` / `release` call.
+Issues with no metadata omit the `metadata:` block entirely — it is written
+lazily by `issue metadata set` and dropped again when `unset` removes the
+last key.
 
 IDs are assigned as `max(existing)+1`. Whether `.issues/` is committed to git
 is up to you — the CLI doesn't touch `.gitignore`.
