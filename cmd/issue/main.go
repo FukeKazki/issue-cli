@@ -32,6 +32,10 @@ func main() {
 		err = cli.Next(args)
 	case "edit":
 		err = cli.Edit(args)
+	case "claim":
+		err = cli.Claim(args)
+	case "release":
+		err = cli.Release(args)
 	case "-h", "--help", "help":
 		usage()
 		return
@@ -59,6 +63,10 @@ func usage() {
   issue next [--format json]             print the next TODO issue as JSON ({"issue": null} if none)
   issue create [--title TITLE]
   issue edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
+  issue claim <id> [--workflow NAME] [--run-id ID] [--force] [--format json]
+                                         transition TODO -> In Progress and record workflow run metadata
+  issue release <id> --result success|failure|interrupted [--error MSG] [--pr-url URL] [--format json]
+                                         record the terminal result of a workflow run on the issue
 
 Keys in list:
   Enter   show issue detail (q/Esc to return)
