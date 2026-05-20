@@ -9,6 +9,7 @@ Usage:
 Options:
   --workflow NAME       simple-takt workflow name (default: issue-dev)
   --limit N            maximum number of issues to run (default: 1)
+  --until-empty        keep selecting TODO issues until none remain
   --issue ID           run one specific issue instead of selecting from TODO
   --task-format FORMAT issue show format passed to simple-takt: markdown|json|yaml (default: markdown)
   --continue-on-error  record failed runs and continue with the next issue
@@ -26,6 +27,8 @@ EOF
 
 workflow="issue-dev"
 limit="1"
+limit_set="false"
+until_empty="false"
 issue_id=""
 task_format="markdown"
 dry_run="false"
@@ -41,7 +44,12 @@ while [ "$#" -gt 0 ]; do
       ;;
     --limit)
       limit="${2:?--limit requires a value}"
+      limit_set="true"
       shift 2
+      ;;
+    --until-empty)
+      until_empty="true"
+      shift
       ;;
     --issue)
       issue_id="${2:?--issue requires a value}"
@@ -89,6 +97,10 @@ if [ "$limit" -lt 1 ]; then
   echo "--limit must be a positive integer" >&2
   exit 2
 fi
+if [ "$until_empty" = "true" ] && [ -n "$issue_id" ]; then
+  echo "--until-empty cannot be combined with --issue" >&2
+  exit 2
+fi
 
 case "$task_format" in
   markdown|json|yaml) ;;
@@ -101,6 +113,10 @@ esac
 takt_bin="${SIMPLE_TAKT_BIN:-simple-takt}"
 log_dir="${ISSUE_TAKT_LOG_DIR:-.takt/issue-runner}"
 task_file=""
+max_runs="$limit"
+if [ "$until_empty" = "true" ] && [ "$limit_set" != "true" ]; then
+  max_runs="0"
+fi
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -140,19 +156,31 @@ case "$worktree_dir" in
   *) worktree_dir="${repo_root}/${worktree_dir}" ;;
 esac
 
+attempted_ids=()
+
 select_issue_ids() {
+  select_limit="$1"
+
   if [ -n "$issue_id" ]; then
     printf '%s\n' "$issue_id"
     return
   fi
 
+  attempted_ids_text="$(printf '%s\n' "${attempted_ids[@]}")"
   "$issue_bin" list --status TODO --format json |
-    jq -r --argjson limit "$limit" '
-      [
+    jq -r --argjson limit "$select_limit" --arg attempted "$attempted_ids_text" '
+      ($attempted | split("\n") | map(select(. != "") | tonumber)) as $attemptedIDs |
+      ([
         .[]
         | select((((.metadata // {})["workflow-status"] // "") as $s | ($s != "running" and $s != "queued")))
+        | select((.id as $id | $attemptedIDs | index($id) | not))
         | .id
-      ][: $limit][]
+      ]) as $ids |
+      if $limit == 0 then
+        $ids[]
+      else
+        $ids[: $limit][]
+      end
     '
 }
 
@@ -205,12 +233,6 @@ ensure_worktree() {
   printf '%s\n' "$path"
 }
 
-ids="$(select_issue_ids)"
-if [ -z "$ids" ]; then
-  echo "no runnable TODO issues"
-  exit 0
-fi
-
 if [ "$dry_run" != "true" ]; then
   mkdir -p "$log_dir"
 fi
@@ -256,8 +278,10 @@ print_summary() {
   done
 }
 
-while IFS= read -r id; do
-  [ -n "$id" ] || continue
+run_issue() {
+  id="$1"
+  [ -n "$id" ] || return 0
+  attempted_ids+=("$id")
 
   run_id="$(date +%Y%m%d-%H%M%S)-issue-${id}"
   started_at="$(iso_now)"
@@ -272,7 +296,7 @@ while IFS= read -r id; do
     else
       printf 'would run #%s: %s (workflow=%s, task-format=%s)\n' "$id" "$title" "$workflow" "$task_format"
     fi
-    continue
+    return 0
   fi
 
   if [ "$use_worktree" = "true" ]; then
@@ -293,11 +317,7 @@ while IFS= read -r id; do
       failed_count=$((failed_count + 1))
       last_exit_code="$exit_code"
       add_summary_row failed "$id" "$exit_code" "$log_file" "$worktree_path"
-      if [ "$continue_on_error" != "true" ]; then
-        break
-      fi
-      echo "continuing after failure because --continue-on-error is set" >&2
-      continue
+      return "$exit_code"
     fi
   fi
 
@@ -319,7 +339,19 @@ while IFS= read -r id; do
 
   "$issue_bin" show "$id" --format "$task_format" >"$task_file"
 
-  if (cd "$run_dir" && "$takt_bin" -w "$workflow" <"$task_file") > >(tee "$log_file") 2> >(tee -a "$log_file" >&2); then
+  if (
+    cd "$run_dir" && env \
+      ISSUE_ID="$id" \
+      ISSUE_RUN_ID="$run_id" \
+      ISSUE_WORKFLOW="$workflow" \
+      ISSUE_BIN="$issue_bin" \
+      ISSUE_REPO_ROOT="$repo_root" \
+      ISSUE_RUN_DIR="$run_dir" \
+      ISSUE_WORKTREE_PATH="$worktree_path" \
+      ISSUE_TASK_FORMAT="$task_format" \
+      ISSUE_LOG_FILE="$log_file" \
+      "$takt_bin" -w "$workflow" <"$task_file"
+  ) > >(tee "$log_file") 2> >(tee -a "$log_file" >&2); then
     finished_at="$(iso_now)"
     "$issue_bin" metadata set "$id" \
       workflow-status=success \
@@ -329,6 +361,9 @@ while IFS= read -r id; do
     echo "issue #${id}: workflow succeeded"
     succeeded_count=$((succeeded_count + 1))
     add_summary_row success "$id" 0 "$log_file" "$worktree_path"
+    rm -f "$task_file"
+    task_file=""
+    return 0
   else
     exit_code="$?"
     finished_at="$(iso_now)"
@@ -341,17 +376,55 @@ while IFS= read -r id; do
     failed_count=$((failed_count + 1))
     last_exit_code="$exit_code"
     add_summary_row failed "$id" "$exit_code" "$log_file" "$worktree_path"
-    if [ "$continue_on_error" != "true" ]; then
-      rm -f "$task_file"
-      task_file=""
-      break
-    fi
-    echo "continuing after failure because --continue-on-error is set" >&2
   fi
 
   rm -f "$task_file"
   task_file=""
-done <<<"$ids"
+  return "$exit_code"
+}
+
+run_count=0
+while :; do
+  if [ "$max_runs" -gt 0 ]; then
+    remaining=$((max_runs - run_count))
+    if [ "$remaining" -le 0 ]; then
+      break
+    fi
+  else
+    remaining=0
+  fi
+
+  if [ "$until_empty" = "true" ] && [ "$dry_run" != "true" ]; then
+    select_limit=1
+  else
+    select_limit="$remaining"
+  fi
+
+  ids="$(select_issue_ids "$select_limit")"
+  if [ -z "$ids" ]; then
+    if [ "$run_count" -eq 0 ]; then
+      echo "no runnable TODO issues"
+    fi
+    break
+  fi
+
+  while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    run_count=$((run_count + 1))
+    if run_issue "$id"; then
+      :
+    else
+      if [ "$continue_on_error" != "true" ]; then
+        break 2
+      fi
+      echo "continuing after failure because --continue-on-error is set" >&2
+    fi
+  done <<<"$ids"
+
+  if [ "$until_empty" != "true" ] || [ "$dry_run" = "true" ]; then
+    break
+  fi
+done
 
 print_summary
 
