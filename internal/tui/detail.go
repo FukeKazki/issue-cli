@@ -28,6 +28,12 @@ func RenderDetail(iss *model.Issue) string {
 
 	statusBadge := lipgloss.NewStyle().Foreground(statusColor[iss.Status]).Bold(true).Render(string(iss.Status))
 	fmt.Fprintln(&b, labelStyle.Render("Status: ")+statusBadge)
+
+	typeText := string(iss.Type)
+	if typeText == "" {
+		typeText = "(none)"
+	}
+	fmt.Fprintln(&b, labelStyle.Render("Type:   ")+typeText)
 	fmt.Fprintln(&b)
 
 	fmt.Fprintln(&b, labelStyle.Render("Description:"))

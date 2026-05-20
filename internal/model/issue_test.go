@@ -14,6 +14,49 @@ func TestStatusRankOrdering(t *testing.T) {
 	}
 }
 
+func TestAllTypesOrdering(t *testing.T) {
+	want := []Type{TypeBug, TypeFeature, TypeDocs, TypeRefactor}
+	got := AllTypes()
+	if len(got) != len(want) {
+		t.Fatalf("AllTypes() len = %d, want %d", len(got), len(want))
+	}
+	for i, v := range want {
+		if got[i] != v {
+			t.Errorf("AllTypes()[%d] = %q, want %q", i, got[i], v)
+		}
+	}
+}
+
+func TestParseType(t *testing.T) {
+	cases := []struct {
+		name   string
+		in     string
+		want   Type
+		wantOK bool
+	}{
+		{"canonical Bug", "Bug", TypeBug, true},
+		{"canonical Feature", "Feature", TypeFeature, true},
+		{"canonical Docs", "Docs", TypeDocs, true},
+		{"canonical Refactor", "Refactor", TypeRefactor, true},
+		{"empty rejected", "", "", false},
+		{"lowercase rejected", "bug", "", false},
+		{"uppercase rejected", "BUG", "", false},
+		{"unknown rejected", "Bogus", "", false},
+		{"whitespace rejected", " Bug", "", false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got, ok := ParseType(c.in)
+			if ok != c.wantOK {
+				t.Fatalf("ParseType(%q) ok = %v, want %v", c.in, ok, c.wantOK)
+			}
+			if got != c.want {
+				t.Errorf("ParseType(%q) = %q, want %q", c.in, got, c.want)
+			}
+		})
+	}
+}
+
 func TestAdvanceStatusForwardOnly(t *testing.T) {
 	cases := []struct {
 		name      string

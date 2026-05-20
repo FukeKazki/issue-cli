@@ -155,6 +155,33 @@ func TestIsDirty(t *testing.T) {
 			want: true,
 		},
 		{
+			name: "type set from (none) is dirty",
+			iss:  model.Issue{Status: model.StatusTODO},
+			mutate: func(m *formModel) {
+				m.typeIdx = (m.typeIdx + 1) % len(m.types)
+			},
+			want: true,
+		},
+		{
+			name: "type unchanged from initial is clean",
+			iss: model.Issue{
+				Status: model.StatusTODO,
+				Type:   model.TypeFeature,
+			},
+			want: false,
+		},
+		{
+			name: "type changed from initial is dirty",
+			iss: model.Issue{
+				Status: model.StatusTODO,
+				Type:   model.TypeFeature,
+			},
+			mutate: func(m *formModel) {
+				m.typeIdx = (m.typeIdx + 1) % len(m.types)
+			},
+			want: true,
+		},
+		{
 			name: "edit scenario with unchanged values is clean",
 			iss: model.Issue{
 				Title:       "existing",

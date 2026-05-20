@@ -31,6 +31,7 @@ var ErrCanceled = errors.New("canceled")
 const (
 	focusTitle = iota
 	focusStatus
+	focusType
 	focusDescription
 	focusRefs
 	focusScope
@@ -94,6 +95,8 @@ type formModel struct {
 	blockedByArea         textarea.Model
 	statuses              []model.Status
 	statusIdx             int
+	types                 []model.Type
+	typeIdx               int
 	focus                 int
 	width                 int
 	height                int
@@ -170,6 +173,19 @@ func newFormModel(iss *model.Issue, header string, candidates []IssueCandidate) 
 		}
 	}
 
+	// types[0] is the empty "(none)" sentinel so that an Issue without a Type
+	// (existing on-disk issues created before Type was introduced) round-trips
+	// through the form unchanged. Selecting it from the picker writes "" back
+	// onto Issue.Type.
+	types := append([]model.Type{""}, model.AllTypes()...)
+	tIdx := 0
+	for i, tp := range types {
+		if tp == iss.Type {
+			tIdx = i
+			break
+		}
+	}
+
 	return formModel{
 		header:        header,
 		iss:           iss,
@@ -180,6 +196,8 @@ func newFormModel(iss *model.Issue, header string, candidates []IssueCandidate) 
 		blockedByArea: blockedBy,
 		statuses:      statuses,
 		statusIdx:     idx,
+		types:         types,
+		typeIdx:       tIdx,
 		focus:         focusTitle,
 		repoFiles:     listRepoFiles(),
 		candidates:    candidates,
@@ -312,7 +330,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.applyFocus()
 			return m, nil
 		case "enter":
-			if m.focus == focusTitle || m.focus == focusStatus {
+			if m.focus == focusTitle || m.focus == focusStatus || m.focus == focusType {
 				m.focus = (m.focus + 1) % focusCount
 				m.applyFocus()
 				return m, nil
@@ -325,6 +343,16 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.statusIdx = (m.statusIdx - 1 + len(m.statuses)) % len(m.statuses)
 			case "right", "l", "down", "j", " ":
 				m.statusIdx = (m.statusIdx + 1) % len(m.statuses)
+			}
+			return m, nil
+		}
+
+		if m.focus == focusType {
+			switch msg.String() {
+			case "left", "h", "up", "k":
+				m.typeIdx = (m.typeIdx - 1 + len(m.types)) % len(m.types)
+			case "right", "l", "down", "j", " ":
+				m.typeIdx = (m.typeIdx + 1) % len(m.types)
 			}
 			return m, nil
 		}
@@ -431,6 +459,9 @@ func (m formModel) isDirty() bool {
 	if m.statuses[m.statusIdx] != m.iss.Status {
 		return true
 	}
+	if m.types[m.typeIdx] != m.iss.Type {
+		return true
+	}
 	if strings.TrimRight(m.descArea.Value(), "\n") != m.iss.Description {
 		return true
 	}
@@ -492,6 +523,13 @@ func (m formModel) renderFormPanel() string {
 	b.WriteString(hintStyle.Render("←/→ change"))
 	b.WriteString("\n")
 	b.WriteString(m.renderStatusRow())
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("TYPE", focusType))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("←/→ change"))
+	b.WriteString("\n")
+	b.WriteString(m.renderTypeRow())
 	b.WriteString("\n\n")
 
 	b.WriteString(m.fieldLabel("DESCRIPTION", focusDescription))
@@ -565,6 +603,33 @@ func (m formModel) renderStatusRow() string {
 	return strings.Join(parts, " ")
 }
 
+// renderTypeRow mirrors renderStatusRow but draws the optional Type picker.
+// The first entry is the empty "(none)" sentinel so the user can clear the
+// field; the remaining entries are the canonical model.AllTypes() values.
+func (m formModel) renderTypeRow() string {
+	parts := make([]string, 0, len(m.types))
+	for i, tp := range m.types {
+		text := string(tp)
+		if text == "" {
+			text = "(none)"
+		}
+		if i == m.typeIdx {
+			style := lipgloss.NewStyle().
+				Foreground(colAccent).
+				Bold(true).
+				Background(lipgloss.Color("236")).
+				Padding(0, 1)
+			parts = append(parts, style.Render("● "+text))
+		} else {
+			style := lipgloss.NewStyle().
+				Foreground(colMuted).
+				Padding(0, 1)
+			parts = append(parts, style.Render("○ "+text))
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
 func (m formModel) renderFooter() string {
 	keys := []string{
 		"tab/shift+tab move",
@@ -588,6 +653,7 @@ func RunForm(iss *model.Issue, header string, confirmOnCancel bool, candidates [
 	}
 	iss.Title = strings.TrimSpace(fm.titleInput.Value())
 	iss.Status = fm.statuses[fm.statusIdx]
+	iss.Type = fm.types[fm.typeIdx]
 	iss.Description = strings.TrimRight(fm.descArea.Value(), "\n")
 	iss.References = splitLines(fm.refsArea.Value())
 	iss.Scope = normalizeScope(splitLines(fm.scopeArea.Value()))

@@ -170,6 +170,14 @@ func validate(iss *model.Issue) error {
 	if _, ok := model.ParseStatus(string(iss.Status)); !ok {
 		return fmt.Errorf("invalid status %q", iss.Status)
 	}
+	// Type is optional — empty string is allowed for backwards compatibility
+	// with on-disk issues created before Type was introduced. Non-empty values
+	// must be one of the canonical four.
+	if iss.Type != "" {
+		if _, ok := model.ParseType(string(iss.Type)); !ok {
+			return fmt.Errorf("invalid type %q", iss.Type)
+		}
+	}
 	for _, bid := range iss.BlockedBy {
 		if bid <= 0 {
 			return fmt.Errorf("blocked_by contains non-positive id %d", bid)

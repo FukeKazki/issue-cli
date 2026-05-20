@@ -94,7 +94,12 @@ func writeYAML(w io.Writer, v any) error {
 func writeMarkdown(w io.Writer, iss *model.Issue) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "# #%d  %s\n\n", iss.ID, iss.Title)
-	fmt.Fprintf(&b, "**Status:** %s\n\n", iss.Status)
+	fmt.Fprintf(&b, "**Status:** %s\n", iss.Status)
+	typeText := string(iss.Type)
+	if typeText == "" {
+		typeText = "(none)"
+	}
+	fmt.Fprintf(&b, "**Type:** %s\n\n", typeText)
 
 	fmt.Fprintln(&b, "## Description")
 	if strings.TrimSpace(iss.Description) == "" {
