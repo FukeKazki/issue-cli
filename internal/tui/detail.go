@@ -60,6 +60,16 @@ func RenderDetail(iss *model.Issue) string {
 	}
 	fmt.Fprintln(&b)
 
+	fmt.Fprintln(&b, labelStyle.Render("Blocked by:"))
+	if len(iss.BlockedBy) == 0 {
+		fmt.Fprintln(&b, "  (none)")
+	} else {
+		for _, id := range iss.BlockedBy {
+			fmt.Fprintf(&b, "  - #%d\n", id)
+		}
+	}
+	fmt.Fprintln(&b)
+
 	fmt.Fprintln(&b, labelStyle.Render(fmt.Sprintf("Created: %s", fmtTime(iss.CreatedAt))))
 	fmt.Fprintln(&b, labelStyle.Render(fmt.Sprintf("Updated: %s", fmtTime(iss.UpdatedAt))))
 	return b.String()

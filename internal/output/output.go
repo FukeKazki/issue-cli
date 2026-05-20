@@ -124,6 +124,16 @@ func writeMarkdown(w io.Writer, iss *model.Issue) error {
 	}
 	fmt.Fprintln(&b)
 
+	fmt.Fprintln(&b, "## Blocked by")
+	if len(iss.BlockedBy) == 0 {
+		fmt.Fprintln(&b, "(none)")
+	} else {
+		for _, id := range iss.BlockedBy {
+			fmt.Fprintf(&b, "- #%d\n", id)
+		}
+	}
+	fmt.Fprintln(&b)
+
 	fmt.Fprintf(&b, "Created: %s\n", fmtTime(iss.CreatedAt))
 	fmt.Fprintf(&b, "Updated: %s\n", fmtTime(iss.UpdatedAt))
 

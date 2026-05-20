@@ -52,6 +52,7 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 		Status:     model.StatusTODO,
 		References: []string{"https://example.com", "design.md"},
 		Scope:      []string{"@apps/web/x.tsx"},
+		BlockedBy:  []int{2, 3},
 	}
 	if err := s.Save(in); err != nil {
 		t.Fatal(err)
@@ -63,8 +64,48 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	if out.Title != in.Title || out.Status != in.Status || len(out.References) != 2 || len(out.Scope) != 1 {
 		t.Fatalf("round-trip mismatch: %+v", out)
 	}
+	if len(out.BlockedBy) != 2 || out.BlockedBy[0] != 2 || out.BlockedBy[1] != 3 {
+		t.Fatalf("blocked_by round-trip mismatch: %+v", out.BlockedBy)
+	}
 	if out.CreatedAt.IsZero() || out.UpdatedAt.IsZero() {
 		t.Fatalf("timestamps should be set")
+	}
+}
+
+func TestSaveRejectsSelfBlock(t *testing.T) {
+	s := newTestStore(t)
+	err := s.Save(&model.Issue{
+		ID:        1,
+		Title:     "Test",
+		Status:    model.StatusTODO,
+		BlockedBy: []int{1},
+	})
+	if err == nil {
+		t.Fatal("expected error for self-reference in blocked_by")
+	}
+}
+
+func TestSaveRejectsNonPositiveBlockedBy(t *testing.T) {
+	cases := []struct {
+		name string
+		ids  []int
+	}{
+		{"zero", []int{0}},
+		{"negative", []int{-1}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			s := newTestStore(t)
+			err := s.Save(&model.Issue{
+				ID:        1,
+				Title:     "Test",
+				Status:    model.StatusTODO,
+				BlockedBy: c.ids,
+			})
+			if err == nil {
+				t.Fatalf("expected error for blocked_by=%v", c.ids)
+			}
+		})
 	}
 }
 

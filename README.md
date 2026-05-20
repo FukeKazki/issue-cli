@@ -157,6 +157,9 @@ references:
   - https://example.com/spec
 scope:
   - "@apps/web/hoge.tsx"
+blocked_by:                    # other issue ids this one depends on (int array)
+  - 2
+  - 3
 metadata:                      # optional; free-form string key/value pairs
   workflow: issue-dev          # any keys callers choose — the CLI does not interpret them
   run-id: 20260520-abc
@@ -164,6 +167,12 @@ metadata:                      # optional; free-form string key/value pairs
 created_at: 2026-05-16T10:30:00+09:00
 updated_at: 2026-05-16T10:30:00+09:00
 ```
+
+The TUI form (`issue new` / `e` on the list) includes a **BLOCKED BY** field:
+one issue id per line. Typing in the field shows an autocomplete popup of
+existing issues (filtered by id prefix or title substring); `tab`/`enter`
+inserts the selected id. Self-references and non-positive ids are rejected on
+save.
 
 Issues with no metadata omit the `metadata:` block entirely — it is written
 lazily by `issue metadata set` and dropped again when `unset` removes the
