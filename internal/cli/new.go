@@ -12,8 +12,8 @@ import (
 	"github.com/FukeKazki/issue-cli/internal/tui"
 )
 
-func Create(args []string) error {
-	fs := flag.NewFlagSet("create", flag.ContinueOnError)
+func New(args []string) error {
+	fs := flag.NewFlagSet("new", flag.ContinueOnError)
 	title := fs.String("title", "", "title (skips TUI when set)")
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -35,7 +35,7 @@ func Create(args []string) error {
 			return errors.New("--title must not be empty")
 		}
 	} else {
-		if err := tui.RunForm(iss, "Create Issue", true); err != nil {
+		if err := tui.RunForm(iss, "New Issue", true); err != nil {
 			if errors.Is(err, tui.ErrCanceled) {
 				fmt.Fprintln(os.Stderr, "canceled")
 				return nil

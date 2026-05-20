@@ -74,8 +74,8 @@ func List(args []string) error {
 			if err := editIssue(s, res.IssueID); err != nil {
 				fmt.Fprintln(os.Stderr, "edit failed:", err)
 			}
-		case tui.ListActionCreate:
-			if id, err := createFromList(s); err != nil {
+		case tui.ListActionNew:
+			if id, err := newFromList(s); err != nil {
 				fmt.Fprintln(os.Stderr, "create failed:", err)
 			} else if id > 0 {
 				lastID = id
@@ -200,13 +200,13 @@ func advanceOnCheckout(s *store.Store, id int) error {
 	return nil
 }
 
-func createFromList(s *store.Store) (int, error) {
+func newFromList(s *store.Store) (int, error) {
 	id, err := s.NextID()
 	if err != nil {
 		return 0, err
 	}
 	iss := &model.Issue{ID: id, Status: model.StatusTODO}
-	if err := tui.RunForm(iss, "Create Issue", true); err != nil {
+	if err := tui.RunForm(iss, "New Issue", true); err != nil {
 		if errors.Is(err, tui.ErrCanceled) {
 			return 0, nil
 		}

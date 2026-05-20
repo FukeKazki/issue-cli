@@ -26,7 +26,7 @@ issue                                  # show the issue for the current issue/<i
 issue show <id> [--format markdown|yaml|json]
 issue list [--all] [--status=STATUS] [--format json]
 issue next [--format json]             # next actionable TODO issue, for automation
-issue create [--title TITLE]
+issue new [--title TITLE]
 issue edit <id> --status STATUS        # update an issue's status from the CLI (case-insensitive)
 issue metadata <id>                    # show free-form metadata attached to an issue
 issue metadata set <id> k=v [k=v ...]  # merge key/value pairs into the issue's metadata map
@@ -65,7 +65,7 @@ be hit by accident.
 
 Filters: `--all` includes Done, `--status="In Progress"` filters by one status.
 
-### `issue create`
+### `issue new`
 
 Without args → opens TUI form (title / status / references / scope).
 With `--title "..."` → creates with that title, status `TODO`, no references/scope.
@@ -178,7 +178,7 @@ abort with git's own warning.
 ## Claude Code skill
 
 `skills/issue-cli/SKILL.md` is a Claude Code skill that teaches the agent how
-to drive this CLI from a non-interactive context (when to call `issue create
+to drive this CLI from a non-interactive context (when to call `issue new
 --title`, when to read `.issues/<id>.yaml` directly, branch convention, etc.).
 
 Install it via [apm](https://github.com/yoshinani-dev/apm) by adding the

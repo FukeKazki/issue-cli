@@ -24,8 +24,8 @@ func main() {
 	switch sub {
 	case "list", "ls":
 		err = cli.List(args)
-	case "create", "new":
-		err = cli.Create(args)
+	case "new":
+		err = cli.New(args)
 	case "show":
 		err = cli.Show(args)
 	case "next":
@@ -59,7 +59,7 @@ func usage() {
   issue show <id> [--format markdown|yaml|json]
   issue list [--all] [--status=STATUS] [--format json]
   issue next [--format json]             print the next TODO issue as JSON ({"issue": null} if none)
-  issue create [--title TITLE]
+  issue new [--title TITLE]
   issue edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
   issue metadata <id>                    show free-form metadata attached to an issue
   issue metadata set <id> k=v [k=v ...]  merge key/value pairs into the issue's metadata map
@@ -69,7 +69,7 @@ func usage() {
 Keys in list:
   Enter   show issue detail (q/Esc to return)
   c       git checkout issue/<id>
-  n       create new issue
+  n       new issue
   e       edit issue
   s       change status (then 1-4 or enter)
   d       delete issue (confirm)

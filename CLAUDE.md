@@ -20,7 +20,7 @@ go vet ./...
 
 A small Bubble Tea TUI wrapped around a YAML-on-disk store and a thin `git` driver.
 
-- **`cmd/issue/main.go`** — minimal arg parser, dispatches to `internal/cli`. Subcommands: `list`/`ls`, `create`/`new`, `edit`, `show`, `next`, `help`. No flag library at the top level; subcommands use `flag.NewFlagSet`.
+- **`cmd/issue/main.go`** — minimal arg parser, dispatches to `internal/cli`. Subcommands: `list`/`ls`, `new`, `edit`, `show`, `next`, `help`. No flag library at the top level; subcommands use `flag.NewFlagSet`.
 - **`internal/model`** — `Issue` struct + `Status` enum (`TODO` / `In Progress` / `Reviews` / `Done`). `OpenStatuses()` excludes `Done`. `ParseStatus` is the only canonical-strict string→`Status` path (used by `store.validate` to keep YAML on disk in canonical form); `ParseStatusFromCLI` is the case-insensitive/alias-tolerant variant used by `issue edit --status`. `StatusRank` orders the enum and `(*Issue).AdvanceStatus(target)` is the forward-only setter used by auto-transitions (checkout) — prefer it over assigning `iss.Status` directly when the change is driven by an event rather than explicit user choice.
 - **`internal/store`** — one YAML file per issue at `<repo-root>/.issues/<id>.yaml`. Repo root comes from `git rev-parse --show-toplevel` (falls back to CWD). `Save` writes via tempfile + `os.Rename` for atomicity and always stamps `UpdatedAt`. `NextID` is `max(existing)+1` — IDs are never reused even after delete.
 - **`internal/gitx`** — wraps `git symbolic-ref` and `git checkout`. `CurrentIssueID()` parses an `issue/<n>` branch back into an int (returns `0` when the branch does not match). `CheckoutIssue` creates the branch with `-b` if missing, otherwise reuses it.
