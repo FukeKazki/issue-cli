@@ -72,6 +72,58 @@ func TestSaveAndLoadRoundTrip(t *testing.T) {
 	}
 }
 
+func TestSaveAndLoadRoundTripWithType(t *testing.T) {
+	s := newTestStore(t)
+	in := &model.Issue{
+		ID:     1,
+		Title:  "Typed",
+		Status: model.StatusTODO,
+		Type:   model.TypeFeature,
+	}
+	if err := s.Save(in); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.Load(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Type != model.TypeFeature {
+		t.Fatalf("type round-trip mismatch: got %q, want %q", out.Type, model.TypeFeature)
+	}
+}
+
+func TestSaveAndLoadRoundTripEmptyType(t *testing.T) {
+	s := newTestStore(t)
+	in := &model.Issue{
+		ID:     1,
+		Title:  "Untyped",
+		Status: model.StatusTODO,
+	}
+	if err := s.Save(in); err != nil {
+		t.Fatal(err)
+	}
+	out, err := s.Load(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Type != "" {
+		t.Fatalf("empty type should round-trip as empty, got %q", out.Type)
+	}
+}
+
+func TestSaveRejectsInvalidType(t *testing.T) {
+	s := newTestStore(t)
+	err := s.Save(&model.Issue{
+		ID:     1,
+		Title:  "Bad type",
+		Status: model.StatusTODO,
+		Type:   model.Type("Bogus"),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid type")
+	}
+}
+
 func TestSaveRejectsSelfBlock(t *testing.T) {
 	s := newTestStore(t)
 	err := s.Save(&model.Issue{

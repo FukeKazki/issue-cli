@@ -59,10 +59,45 @@ func StatusRank(s Status) int {
 	return -1
 }
 
+// Type classifies what kind of work an Issue represents. It is independent of
+// Status (which tracks lifecycle) — Type is the orthogonal "what is this
+// change about" axis. Empty string is a valid value and means "no type set",
+// which keeps existing on-disk issues (created before Type was introduced)
+// backwards-compatible.
+type Type string
+
+const (
+	TypeBug      Type = "Bug"
+	TypeFeature  Type = "Feature"
+	TypeDocs     Type = "Docs"
+	TypeRefactor Type = "Refactor"
+)
+
+// AllTypes returns the canonical Type values in display order. Order matches
+// the form picker and the issue body's enumeration.
+func AllTypes() []Type {
+	return []Type{TypeBug, TypeFeature, TypeDocs, TypeRefactor}
+}
+
+// ParseType is the canonical-strict string→Type parser. It accepts only the
+// exact canonical spellings ("Bug", "Feature", "Docs", "Refactor"); empty
+// strings and any other input return ok=false. Used by store.validate to keep
+// YAML on disk in canonical form. Empty Type is allowed at the validate layer
+// (Type is optional) — callers decide whether empty is acceptable.
+func ParseType(s string) (Type, bool) {
+	for _, v := range AllTypes() {
+		if string(v) == s {
+			return v, true
+		}
+	}
+	return "", false
+}
+
 type Issue struct {
 	ID          int               `yaml:"id" json:"id"`
 	Title       string            `yaml:"title" json:"title"`
 	Status      Status            `yaml:"status" json:"status"`
+	Type        Type              `yaml:"type,omitempty" json:"type,omitempty"`
 	Description string            `yaml:"description" json:"description"`
 	References  []string          `yaml:"references" json:"references"`
 	Scope       []string          `yaml:"scope" json:"scope"`
