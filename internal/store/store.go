@@ -170,5 +170,13 @@ func validate(iss *model.Issue) error {
 	if _, ok := model.ParseStatus(string(iss.Status)); !ok {
 		return fmt.Errorf("invalid status %q", iss.Status)
 	}
+	for _, bid := range iss.BlockedBy {
+		if bid <= 0 {
+			return fmt.Errorf("blocked_by contains non-positive id %d", bid)
+		}
+		if bid == iss.ID {
+			return fmt.Errorf("issue #%d cannot block itself", iss.ID)
+		}
+	}
 	return nil
 }

@@ -139,7 +139,11 @@ func editIssue(s *store.Store, id int) error {
 	if err != nil {
 		return err
 	}
-	if err := tui.RunForm(iss, "Edit Issue", false); err != nil {
+	cands, err := loadIssueCandidates(s, iss.ID)
+	if err != nil {
+		return err
+	}
+	if err := tui.RunForm(iss, "Edit Issue", false, cands); err != nil {
 		if errors.Is(err, tui.ErrCanceled) {
 			return nil
 		}
@@ -206,7 +210,11 @@ func newFromList(s *store.Store) (int, error) {
 		return 0, err
 	}
 	iss := &model.Issue{ID: id, Status: model.StatusTODO}
-	if err := tui.RunForm(iss, "New Issue", true); err != nil {
+	cands, err := loadIssueCandidates(s, iss.ID)
+	if err != nil {
+		return 0, err
+	}
+	if err := tui.RunForm(iss, "New Issue", true, cands); err != nil {
 		if errors.Is(err, tui.ErrCanceled) {
 			return 0, nil
 		}
@@ -219,4 +227,22 @@ func newFromList(s *store.Store) (int, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// loadIssueCandidates reads all issues from the store and returns the
+// (id, title) pairs needed for the form's blocked_by completion popup.
+// `excludeID` filters out the current issue so a user cannot pick themselves.
+func loadIssueCandidates(s *store.Store, excludeID int) ([]tui.IssueCandidate, error) {
+	issues, err := s.LoadAll()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]tui.IssueCandidate, 0, len(issues))
+	for _, iss := range issues {
+		if iss.ID == excludeID {
+			continue
+		}
+		out = append(out, tui.IssueCandidate{ID: iss.ID, Title: iss.Title})
+	}
+	return out, nil
 }

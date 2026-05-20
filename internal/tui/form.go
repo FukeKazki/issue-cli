@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os/exec"
 	"sort"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -16,6 +17,14 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
+// IssueCandidate is the minimal shape RunForm needs to drive the blocked_by
+// completion popup. Passed in by the cli layer so internal/tui keeps zero
+// dependency on internal/store.
+type IssueCandidate struct {
+	ID    int
+	Title string
+}
+
 // ErrCanceled is returned by RunForm when the user aborts with Esc/Ctrl+C.
 var ErrCanceled = errors.New("canceled")
 
@@ -25,6 +34,7 @@ const (
 	focusDescription
 	focusRefs
 	focusScope
+	focusBlockedBy
 	focusCount
 )
 
@@ -81,6 +91,7 @@ type formModel struct {
 	descArea              textarea.Model
 	refsArea              textarea.Model
 	scopeArea             textarea.Model
+	blockedByArea         textarea.Model
 	statuses              []model.Status
 	statusIdx             int
 	focus                 int
@@ -91,11 +102,14 @@ type formModel struct {
 	errMsg                string
 	repoFiles             []string
 	scopeCompletion       completionState
+	candidates            []IssueCandidate
+	blockedByCompletion   completionState
+	blockedByCandidates   []IssueCandidate
 	confirmOnCancel       bool
 	awaitingCancelConfirm bool
 }
 
-func newFormModel(iss *model.Issue, header string) formModel {
+func newFormModel(iss *model.Issue, header string, candidates []IssueCandidate) formModel {
 	ti := textinput.New()
 	ti.Placeholder = "Concise title"
 	ti.CharLimit = 200
@@ -135,6 +149,16 @@ func newFormModel(iss *model.Issue, header string) formModel {
 	scope.CharLimit = 0
 	scope.Blur()
 
+	blockedBy := textarea.New()
+	blockedBy.Placeholder = "1"
+	blockedBy.Prompt = "│ "
+	blockedBy.ShowLineNumbers = false
+	blockedBy.SetValue(joinIssueIDs(iss.BlockedBy))
+	blockedBy.SetWidth(defaultFormWidth - 2)
+	blockedBy.SetHeight(textareaHeight)
+	blockedBy.CharLimit = 0
+	blockedBy.Blur()
+
 	statuses := model.AllStatuses()
 	idx := 0
 	if iss.Status != "" {
@@ -147,16 +171,18 @@ func newFormModel(iss *model.Issue, header string) formModel {
 	}
 
 	return formModel{
-		header:     header,
-		iss:        iss,
-		titleInput: ti,
-		descArea:   desc,
-		refsArea:   refs,
-		scopeArea:  scope,
-		statuses:   statuses,
-		statusIdx:  idx,
-		focus:      focusTitle,
-		repoFiles:  listRepoFiles(),
+		header:        header,
+		iss:           iss,
+		titleInput:    ti,
+		descArea:      desc,
+		refsArea:      refs,
+		scopeArea:     scope,
+		blockedByArea: blockedBy,
+		statuses:      statuses,
+		statusIdx:     idx,
+		focus:         focusTitle,
+		repoFiles:     listRepoFiles(),
+		candidates:    candidates,
 	}
 }
 
@@ -177,6 +203,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.descArea.SetWidth(fw)
 		m.refsArea.SetWidth(fw)
 		m.scopeArea.SetWidth(fw)
+		m.blockedByArea.SetWidth(fw)
 		fitDescHeight(&m.descArea)
 		return m, nil
 
@@ -218,6 +245,29 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		if m.focus == focusBlockedBy && m.blockedByCompletion.active {
+			switch msg.String() {
+			case "esc":
+				m.blockedByCompletion.active = false
+				return m, nil
+			case "up", "ctrl+p":
+				if n := len(m.blockedByCompletion.items); n > 0 {
+					m.blockedByCompletion.idx = (m.blockedByCompletion.idx - 1 + n) % n
+				}
+				return m, nil
+			case "down", "ctrl+n":
+				if n := len(m.blockedByCompletion.items); n > 0 {
+					m.blockedByCompletion.idx = (m.blockedByCompletion.idx + 1) % n
+				}
+				return m, nil
+			case "tab", "enter":
+				if len(m.blockedByCompletion.items) > 0 {
+					m.applyBlockedByCompletion()
+				}
+				m.blockedByCompletion.active = false
+				return m, nil
+			}
+		}
 		switch msg.String() {
 		case "ctrl+c":
 			m.canceled = true
@@ -235,6 +285,21 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.focus = focusTitle
 				m.applyFocus()
 				return m, nil
+			}
+			parsed, err := parseIssueIDs(m.blockedByArea.Value())
+			if err != nil {
+				m.errMsg = err.Error()
+				m.focus = focusBlockedBy
+				m.applyFocus()
+				return m, nil
+			}
+			for _, id := range parsed {
+				if id == m.iss.ID {
+					m.errMsg = "blocked by cannot reference self"
+					m.focus = focusBlockedBy
+					m.applyFocus()
+					return m, nil
+				}
 			}
 			m.submitted = true
 			return m, tea.Quit
@@ -277,6 +342,9 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case focusScope:
 		m.scopeArea, cmd = m.scopeArea.Update(msg)
 		m.recomputeScopeCompletion()
+	case focusBlockedBy:
+		m.blockedByArea, cmd = m.blockedByArea.Update(msg)
+		m.recomputeBlockedByCompletion()
 	}
 	return m, cmd
 }
@@ -334,6 +402,13 @@ func (m *formModel) applyFocus() {
 		m.scopeArea.Blur()
 		m.scopeCompletion.active = false
 	}
+	if m.focus == focusBlockedBy {
+		m.blockedByArea.Focus()
+		m.recomputeBlockedByCompletion()
+	} else {
+		m.blockedByArea.Blur()
+		m.blockedByCompletion.active = false
+	}
 }
 
 func (m formModel) View() string {
@@ -363,6 +438,9 @@ func (m formModel) isDirty() bool {
 		return true
 	}
 	if !stringSliceEqual(normalizeScope(splitLines(m.scopeArea.Value())), m.iss.Scope) {
+		return true
+	}
+	if strings.TrimRight(m.blockedByArea.Value(), "\n") != joinIssueIDs(m.iss.BlockedBy) {
 		return true
 	}
 	return false
@@ -439,6 +517,17 @@ func (m formModel) renderFormPanel() string {
 		b.WriteString("\n")
 		b.WriteString(m.renderScopeCompletion())
 	}
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("BLOCKED BY", focusBlockedBy))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("one issue id per line; type to search"))
+	b.WriteString("\n")
+	b.WriteString(m.blockedByArea.View())
+	if m.focus == focusBlockedBy && m.blockedByCompletion.active {
+		b.WriteString("\n")
+		b.WriteString(m.renderBlockedByCompletion())
+	}
 
 	if m.errMsg != "" {
 		b.WriteString("\n\n")
@@ -485,8 +574,8 @@ func (m formModel) renderFooter() string {
 	return footerStyle.Render(strings.Join(keys, "  •  "))
 }
 
-func RunForm(iss *model.Issue, header string, confirmOnCancel bool) error {
-	m := newFormModel(iss, header)
+func RunForm(iss *model.Issue, header string, confirmOnCancel bool, candidates []IssueCandidate) error {
+	m := newFormModel(iss, header, candidates)
 	m.confirmOnCancel = confirmOnCancel
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	finalModel, err := p.Run()
@@ -502,6 +591,9 @@ func RunForm(iss *model.Issue, header string, confirmOnCancel bool) error {
 	iss.Description = strings.TrimRight(fm.descArea.Value(), "\n")
 	iss.References = splitLines(fm.refsArea.Value())
 	iss.Scope = normalizeScope(splitLines(fm.scopeArea.Value()))
+	// blockedByArea was validated by the ctrl+s handler before submission.
+	ids, _ := parseIssueIDs(fm.blockedByArea.Value())
+	iss.BlockedBy = ids
 	return nil
 }
 
@@ -696,4 +788,189 @@ func filterRepoFiles(files []string, query string) []string {
 		out[i] = h.path
 	}
 	return out
+}
+
+// joinIssueIDs renders []int as one decimal id per line (no `#` prefix).
+// Empty / nil input returns an empty string so SetValue produces a blank field.
+func joinIssueIDs(ids []int) string {
+	if len(ids) == 0 {
+		return ""
+	}
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = strconv.Itoa(id)
+	}
+	return strings.Join(parts, "\n")
+}
+
+// parseIssueIDs parses the blockedByArea raw value into a slice of issue IDs.
+// One id per non-blank line; an optional leading "#" is tolerated. Any token
+// that fails strconv.Atoi or is <= 0 yields an error. Returns nil (not []int{})
+// on empty input so callers can distinguish "no ids" from a zero-length slice
+// without extra checks — YAML marshaling treats both as `blocked_by: []`.
+func parseIssueIDs(raw string) ([]int, error) {
+	var out []int
+	for _, line := range strings.Split(raw, "\n") {
+		s := strings.TrimSpace(line)
+		if s == "" {
+			continue
+		}
+		s = strings.TrimPrefix(s, "#")
+		s = strings.TrimSpace(s)
+		n, err := strconv.Atoi(s)
+		if err != nil {
+			return nil, fmt.Errorf("blocked by: %q is not a valid issue id", line)
+		}
+		if n <= 0 {
+			return nil, fmt.Errorf("blocked by: id must be positive (got %d)", n)
+		}
+		out = append(out, n)
+	}
+	return out, nil
+}
+
+// filterIssueCandidates ranks candidates for the blocked_by completion popup.
+// Rank 0: id prefix match (e.g. query "1" matches #1, #10, #11). Rank 1: case-
+// insensitive title substring match. Ties break by id ascending. Up to 50
+// items are returned. `excludeID` removes the candidate matching the current
+// issue (self-block guard).
+func filterIssueCandidates(cands []IssueCandidate, query string, excludeID int) []IssueCandidate {
+	if len(cands) == 0 {
+		return nil
+	}
+	const limit = 50
+	q := strings.TrimSpace(query)
+	if q == "" {
+		out := make([]IssueCandidate, 0, len(cands))
+		for _, c := range cands {
+			if c.ID == excludeID {
+				continue
+			}
+			out = append(out, c)
+			if len(out) >= limit {
+				break
+			}
+		}
+		return out
+	}
+	q = strings.TrimPrefix(q, "#")
+	lq := strings.ToLower(q)
+	type scored struct {
+		cand IssueCandidate
+		rank int
+	}
+	var hits []scored
+	for _, c := range cands {
+		if c.ID == excludeID {
+			continue
+		}
+		idStr := strconv.Itoa(c.ID)
+		switch {
+		case strings.HasPrefix(idStr, q):
+			hits = append(hits, scored{c, 0})
+		case strings.Contains(strings.ToLower(c.Title), lq):
+			hits = append(hits, scored{c, 1})
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].rank != hits[j].rank {
+			return hits[i].rank < hits[j].rank
+		}
+		return hits[i].cand.ID < hits[j].cand.ID
+	})
+	if len(hits) == 0 {
+		return nil
+	}
+	if len(hits) > limit {
+		hits = hits[:limit]
+	}
+	out := make([]IssueCandidate, len(hits))
+	for i, h := range hits {
+		out[i] = h.cand
+	}
+	return out
+}
+
+// recomputeBlockedByCompletion mirrors the scope variant but uses no prefix
+// trigger — the field is dedicated to ids. We *do* require the current row to
+// have at least one non-whitespace character before activating the popup, so
+// that pressing Enter on an empty row still inserts a newline (the popup's
+// Enter handler would otherwise swallow it and the user could never reach a
+// second id). On a non-empty row the popup is always shown.
+func (m *formModel) recomputeBlockedByCompletion() {
+	val := m.blockedByArea.Value()
+	rows := strings.Split(val, "\n")
+	rowIdx := m.blockedByArea.Line()
+	if rowIdx < 0 || rowIdx >= len(rows) {
+		m.blockedByCompletion.active = false
+		return
+	}
+	row := []rune(rows[rowIdx])
+	query := strings.TrimSpace(string(row))
+	if query == "" {
+		m.blockedByCompletion.active = false
+		return
+	}
+	query = strings.TrimPrefix(query, "#")
+	cands := filterIssueCandidates(m.candidates, query, m.iss.ID)
+	display := make([]string, len(cands))
+	for i, c := range cands {
+		display[i] = fmt.Sprintf("#%d  %s", c.ID, c.Title)
+	}
+	prevActive := m.blockedByCompletion.active
+	m.blockedByCompletion.active = true
+	m.blockedByCompletion.row = rowIdx
+	m.blockedByCompletion.atCol = 0
+	m.blockedByCompletion.queryEnd = len(row)
+	m.blockedByCompletion.items = display
+	// store ids alongside displayed labels: keep the candidates in a parallel
+	// slice so applyBlockedByCompletion can look up the id by the current idx.
+	m.blockedByCandidates = cands
+	if !prevActive || m.blockedByCompletion.idx >= len(display) {
+		m.blockedByCompletion.idx = 0
+	}
+}
+
+// applyBlockedByCompletion replaces the current line with the selected
+// candidate's decimal id (no `#` prefix in the buffer — parseIssueIDs accepts
+// either form, but the simpler form keeps the stored YAML clean).
+func (m *formModel) applyBlockedByCompletion() {
+	if m.blockedByCompletion.idx < 0 || m.blockedByCompletion.idx >= len(m.blockedByCandidates) {
+		return
+	}
+	sel := m.blockedByCandidates[m.blockedByCompletion.idx]
+	// Delete the current row contents (queryEnd was set to len(row)).
+	for i := 0; i < m.blockedByCompletion.queryEnd; i++ {
+		m.blockedByArea, _ = m.blockedByArea.Update(tea.KeyMsg{Type: tea.KeyBackspace})
+	}
+	m.blockedByArea.InsertString(strconv.Itoa(sel.ID))
+}
+
+func (m formModel) renderBlockedByCompletion() string {
+	items := m.blockedByCompletion.items
+	box := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(colMuted).
+		Padding(0, 1)
+	if len(items) == 0 {
+		return box.Render(hintStyle.Render("no issues match"))
+	}
+	start, end := windowAround(m.blockedByCompletion.idx, len(items), completionMaxItems)
+	var lines []string
+	for i := start; i < end; i++ {
+		marker := "  "
+		text := items[i]
+		if i == m.blockedByCompletion.idx {
+			marker = labelFocus.Render("▸ ")
+			text = labelFocus.Render(text)
+		} else {
+			text = labelBlur.Render(text)
+		}
+		lines = append(lines, marker+text)
+	}
+	if end < len(items) {
+		lines = append(lines, hintStyle.Render(fmt.Sprintf("  +%d more", len(items)-end)))
+	}
+	lines = append(lines, hintStyle.Render("↑/↓ select • tab/enter insert • esc dismiss"))
+	return box.Render(strings.Join(lines, "\n"))
 }

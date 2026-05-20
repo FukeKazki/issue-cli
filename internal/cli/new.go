@@ -35,7 +35,11 @@ func New(args []string) error {
 			return errors.New("--title must not be empty")
 		}
 	} else {
-		if err := tui.RunForm(iss, "New Issue", true); err != nil {
+		cands, err := loadIssueCandidates(s, iss.ID)
+		if err != nil {
+			return err
+		}
+		if err := tui.RunForm(iss, "New Issue", true, cands); err != nil {
 			if errors.Is(err, tui.ErrCanceled) {
 				fmt.Fprintln(os.Stderr, "canceled")
 				return nil

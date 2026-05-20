@@ -42,6 +42,9 @@ references:
   - https://...
 scope:
   - "@path/to/file"
+blocked_by:          # int 配列。空でも `blocked_by: []` で出力される
+  - 2
+  - 3
 created_at: 2026-05-17T10:00:00+09:00
 updated_at: 2026-05-17T10:00:00+09:00
 ```
@@ -49,6 +52,7 @@ updated_at: 2026-05-17T10:00:00+09:00
 - IDは削除後も再利用されない (常に `max(existing)+1`)
 - YAMLを直接編集したときは `updated_at` も合わせて更新する (`issue` CLIから保存した場合は自動で上書きされる)
 - フィールドを追加する場合は `internal/model/issue.go` の構造体にyamlタグを付ける必要がある
+- `blocked_by` は依存先 Issue ID の配列 (int)。自分自身の ID や 0 以下を含む状態で `Save` するとバリデーションエラーになる。TUIフォーム以外から編集する場合は手書きで `.yaml` を更新する (CLIサブコマンドは未提供)
 
 ## ブランチ規約
 
