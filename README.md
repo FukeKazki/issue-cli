@@ -117,11 +117,6 @@ issue metadata clear 13                                              # すべて
 コマンドは `--format json|yaml|markdown` を受け付け、プレーンテキストのサマ
 リの代わりに更新後の issue を出力できます。
 
-ステータス遷移は引き続き `issue edit --status` の役割です。`metadata` はメ
-タデータマップにしか触りません。ランナー側でアトミックなチェックと書き込み
-が必要な場合は、`issue edit --status "In Progress"`（YAML が下で動いていた
-場合は失敗します）を実行してから `issue metadata set` を実行してください。
-
 ## 自動化 / 機械可読出力
 
 [`simple-takt`](https://github.com/FukeKazki/simple-takt) のようなランナー
