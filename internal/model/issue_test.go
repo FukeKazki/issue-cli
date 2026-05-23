@@ -15,7 +15,7 @@ func TestStatusRankOrdering(t *testing.T) {
 }
 
 func TestAllTypesOrdering(t *testing.T) {
-	want := []Type{TypeBug, TypeFeature, TypeDocs, TypeRefactor}
+	want := []Type{TypeBug, TypeFeature, TypeEnhancement, TypeDocs, TypeRefactor}
 	got := AllTypes()
 	if len(got) != len(want) {
 		t.Fatalf("AllTypes() len = %d, want %d", len(got), len(want))
@@ -36,6 +36,7 @@ func TestParseType(t *testing.T) {
 	}{
 		{"canonical Bug", "Bug", TypeBug, true},
 		{"canonical Feature", "Feature", TypeFeature, true},
+		{"canonical Enhancement", "Enhancement", TypeEnhancement, true},
 		{"canonical Docs", "Docs", TypeDocs, true},
 		{"canonical Refactor", "Refactor", TypeRefactor, true},
 		{"empty rejected", "", "", false},
