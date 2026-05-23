@@ -94,6 +94,24 @@ func ParseType(s string) (Type, bool) {
 	return "", false
 }
 
+// ParseTypeFromCLI normalizes a user-supplied CLI argument to a canonical Type.
+// Accepts case-insensitive input so `bug`, `BUG`, `Bug` all resolve to TypeBug.
+func ParseTypeFromCLI(s string) (Type, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "bug":
+		return TypeBug, true
+	case "feature":
+		return TypeFeature, true
+	case "enhancement":
+		return TypeEnhancement, true
+	case "docs":
+		return TypeDocs, true
+	case "refactor":
+		return TypeRefactor, true
+	}
+	return "", false
+}
+
 type Issue struct {
 	ID          int               `yaml:"id" json:"id"`
 	Title       string            `yaml:"title" json:"title"`
