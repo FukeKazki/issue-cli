@@ -173,7 +173,7 @@ func (m listModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "J":
 		if iss := m.currentIssue(); iss != nil {
-			lines := strings.Split(RenderDetail(iss), "\n")
+			lines := strings.Split(RenderDetail(iss, m.parentOf(iss), m.childrenOf(iss.ID)), "\n")
 			if len(lines) > 0 && lines[len(lines)-1] == "" {
 				lines = lines[:len(lines)-1]
 			}
@@ -369,7 +369,7 @@ func (m listModel) renderPreviewPanel(w int) string {
 		return panelStyle.Width(w).Render(body)
 	}
 
-	detail := RenderDetail(iss)
+	detail := RenderDetail(iss, m.parentOf(iss), m.childrenOf(iss.ID))
 	lines := strings.Split(detail, "\n")
 	// Remove trailing empty line from Split if detail ends with "\n"
 	if len(lines) > 0 && lines[len(lines)-1] == "" {
@@ -445,6 +445,28 @@ func truncateDisplay(s string, max int) string {
 		return runewidth.Truncate(s, max, "")
 	}
 	return runewidth.Truncate(s, max, "...")
+}
+
+func (m listModel) parentOf(iss *model.Issue) *model.Issue {
+	if iss.Parent == nil {
+		return nil
+	}
+	for i := range m.issues {
+		if m.issues[i].ID == *iss.Parent {
+			return &m.issues[i]
+		}
+	}
+	return nil
+}
+
+func (m listModel) childrenOf(id int) []model.Issue {
+	var out []model.Issue
+	for i := range m.issues {
+		if m.issues[i].Parent != nil && *m.issues[i].Parent == id {
+			out = append(out, m.issues[i])
+		}
+	}
+	return out
 }
 
 func (m listModel) renderFooter() string {

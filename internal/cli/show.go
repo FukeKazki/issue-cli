@@ -48,7 +48,11 @@ func Show(args []string) error {
 		return err
 	}
 	if *formatFlag == "" {
-		fmt.Print(tui.RenderDetail(iss))
+		parent, children, err := resolveRelatives(iss, s)
+		if err != nil {
+			return err
+		}
+		fmt.Print(tui.RenderDetail(iss, parent, children))
 		return nil
 	}
 	f, err := output.ParseFormat(*formatFlag)

@@ -102,6 +102,7 @@ type Issue struct {
 	References  []string          `yaml:"references" json:"references"`
 	Scope       []string          `yaml:"scope" json:"scope"`
 	BlockedBy   []int             `yaml:"blocked_by" json:"blocked_by"`
+	Parent      *int              `yaml:"parent,omitempty" json:"parent,omitempty"`
 	Metadata    map[string]string `yaml:"metadata,omitempty" json:"metadata,omitempty"`
 	CreatedAt   time.Time         `yaml:"created_at" json:"created_at"`
 	UpdatedAt   time.Time         `yaml:"updated_at" json:"updated_at"`

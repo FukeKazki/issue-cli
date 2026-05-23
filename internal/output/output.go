@@ -139,6 +139,14 @@ func writeMarkdown(w io.Writer, iss *model.Issue) error {
 	}
 	fmt.Fprintln(&b)
 
+	fmt.Fprintln(&b, "## Parent")
+	if iss.Parent != nil {
+		fmt.Fprintf(&b, "#%d\n", *iss.Parent)
+	} else {
+		fmt.Fprintln(&b, "(none)")
+	}
+	fmt.Fprintln(&b)
+
 	fmt.Fprintf(&b, "Created: %s\n", fmtTime(iss.CreatedAt))
 	fmt.Fprintf(&b, "Updated: %s\n", fmtTime(iss.UpdatedAt))
 

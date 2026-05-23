@@ -8,13 +8,15 @@ import (
 )
 
 type detailModel struct {
-	iss    *model.Issue
-	width  int
-	height int
+	iss      *model.Issue
+	parent   *model.Issue
+	children []model.Issue
+	width    int
+	height   int
 }
 
-func RunDetailView(iss *model.Issue) error {
-	p := tea.NewProgram(detailModel{iss: iss}, tea.WithAltScreen())
+func RunDetailView(iss *model.Issue, parent *model.Issue, children []model.Issue) error {
+	p := tea.NewProgram(detailModel{iss: iss, parent: parent, children: children}, tea.WithAltScreen())
 	_, err := p.Run()
 	return err
 }
@@ -37,6 +39,6 @@ func (m detailModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m detailModel) View() string {
-	body := strings.TrimRight(RenderDetail(m.iss), "\n")
+	body := strings.TrimRight(RenderDetail(m.iss, m.parent, m.children), "\n")
 	return panelStyle.Render(body) + "\n" + footerStyle.Render("q/esc/enter back")
 }
