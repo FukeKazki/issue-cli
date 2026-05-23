@@ -1,6 +1,6 @@
-name: issue
+name: issue-cli
 version: 1.0.0
-description: APM project for issue
+description: APM project for issue-cli
 author: FukeKazki
 dependencies:
   apm: []

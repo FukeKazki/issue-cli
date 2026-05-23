@@ -39,7 +39,7 @@ func ParseFormat(s string) (Format, error) {
 }
 
 // WriteIssue renders a single issue in the requested format. Used by
-// `issue show <id> --format ...`.
+// `issue-cli show <id> --format ...`.
 func WriteIssue(w io.Writer, iss *model.Issue, f Format) error {
 	switch f {
 	case FormatJSON:
@@ -53,7 +53,7 @@ func WriteIssue(w io.Writer, iss *model.Issue, f Format) error {
 }
 
 // WriteIssues renders a slice in the requested format. Currently JSON only —
-// `issue list --format` is documented as JSON-only. An empty slice still
+// `issue-cli list --format` is documented as JSON-only. An empty slice still
 // produces a valid JSON array (`[]`).
 func WriteIssues(w io.Writer, issues []model.Issue, f Format) error {
 	if f != FormatJSON {
@@ -65,7 +65,7 @@ func WriteIssues(w io.Writer, issues []model.Issue, f Format) error {
 	return writeJSON(w, issues)
 }
 
-// WriteNextIssue renders the `issue next` envelope. `nil` produces
+// WriteNextIssue renders the `issue-cli next` envelope. `nil` produces
 // `{"issue": null}` so downstream pipes always receive valid JSON.
 func WriteNextIssue(w io.Writer, iss *model.Issue, f Format) error {
 	if f != FormatJSON {

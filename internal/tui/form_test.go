@@ -10,7 +10,7 @@ import (
 func TestFilterRepoFiles(t *testing.T) {
 	files := []string{
 		"README.md",
-		"cmd/issue/main.go",
+		"cmd/issue-cli/main.go",
 		"internal/cli/new.go",
 		"internal/cli/list.go",
 		"internal/store/store.go",
@@ -142,7 +142,7 @@ func TestIsDirty(t *testing.T) {
 			name: "scope typed is dirty",
 			iss:  model.Issue{Status: model.StatusTODO},
 			mutate: func(m *formModel) {
-				m.scopeArea.SetValue("@cmd/issue/main.go")
+				m.scopeArea.SetValue("@cmd/issue-cli/main.go")
 			},
 			want: true,
 		},
@@ -188,7 +188,7 @@ func TestIsDirty(t *testing.T) {
 				Status:      model.StatusInProgress,
 				Description: "body",
 				References:  []string{"https://example.com"},
-				Scope:       []string{"@cmd/issue/main.go"},
+				Scope:       []string{"@cmd/issue-cli/main.go"},
 			},
 			want: false,
 		},

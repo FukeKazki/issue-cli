@@ -11,7 +11,7 @@ Options:
   --limit N            maximum number of issues to run (default: 1)
   --until-empty        keep selecting TODO issues until none remain
   --issue ID           run one specific issue instead of selecting from TODO
-  --task-format FORMAT issue show format passed to simple-takt: markdown|json|yaml (default: markdown)
+  --task-format FORMAT issue-cli show format passed to simple-takt: markdown|json|yaml (default: markdown)
   --continue-on-error  record failed runs and continue with the next issue
   --worktree           run each issue in an isolated git worktree
   --worktree-dir DIR   base directory for worktrees (default: ../issue-worktrees)
@@ -19,7 +19,7 @@ Options:
   -h, --help           show this help
 
 Environment:
-  ISSUE_BIN            issue command to use (default: issue)
+  ISSUE_BIN            issue command to use (default: issue-cli)
   SIMPLE_TAKT_BIN      simple-takt command to use (default: simple-takt)
   ISSUE_TAKT_LOG_DIR   log directory (default: .takt/issue-runner)
 EOF
@@ -136,7 +136,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-issue_bin="${ISSUE_BIN:-issue}"
+issue_bin="${ISSUE_BIN:-issue-cli}"
 require_cmd jq
 require_cmd "$issue_bin"
 if [ "$use_worktree" = "true" ]; then

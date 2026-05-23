@@ -12,18 +12,18 @@ import (
 	"github.com/FukeKazki/issue-cli/internal/store"
 )
 
-// Metadata dispatches `issue metadata` subcommands. Free-form key/value
+// Metadata dispatches `issue-cli metadata` subcommands. Free-form key/value
 // attributes are stored on Issue.Metadata so external tools — automation
 // runners or humans — can attach context to an issue without the CLI
 // hard-coding a schema.
 //
 // Subcommands:
 //
-//	issue metadata <id>                              # show (implicit)
-//	issue metadata show <id> [--format ...]
-//	issue metadata set <id> key=value [key=value ...] [--format json]
-//	issue metadata unset <id> key [key ...] [--format json]
-//	issue metadata clear <id> [--format json]
+//	issue-cli metadata <id>                              # show (implicit)
+//	issue-cli metadata show <id> [--format ...]
+//	issue-cli metadata set <id> key=value [key=value ...] [--format json]
+//	issue-cli metadata unset <id> key [key ...] [--format json]
+//	issue-cli metadata clear <id> [--format json]
 //
 // `set` merges into the existing map (overwriting same-key entries). `unset`
 // removes named keys; the map is dropped entirely when it becomes empty so
@@ -47,7 +47,7 @@ func Metadata(args []string) error {
 }
 
 func metadataUsage() error {
-	return fmt.Errorf("usage: issue metadata <id>  |  set <id> key=value...  |  unset <id> key...  |  clear <id>")
+	return fmt.Errorf("usage: issue-cli metadata <id>  |  set <id> key=value...  |  unset <id> key...  |  clear <id>")
 }
 
 func parseIssueID(arg string) (int, error) {
@@ -118,7 +118,7 @@ func metadataShow(args []string) error {
 
 func metadataSet(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: issue metadata set <id> key=value [key=value ...] [--format json]")
+		return fmt.Errorf("usage: issue-cli metadata set <id> key=value [key=value ...] [--format json]")
 	}
 	id, err := parseIssueID(args[0])
 	if err != nil {
@@ -178,7 +178,7 @@ func metadataSet(args []string) error {
 
 func metadataUnset(args []string) error {
 	if len(args) < 2 {
-		return fmt.Errorf("usage: issue metadata unset <id> key [key ...] [--format json]")
+		return fmt.Errorf("usage: issue-cli metadata unset <id> key [key ...] [--format json]")
 	}
 	id, err := parseIssueID(args[0])
 	if err != nil {
@@ -231,7 +231,7 @@ func metadataUnset(args []string) error {
 
 func metadataClear(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: issue metadata clear <id> [--format json]")
+		return fmt.Errorf("usage: issue-cli metadata clear <id> [--format json]")
 	}
 	id, err := parseIssueID(args[0])
 	if err != nil {

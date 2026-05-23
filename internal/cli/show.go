@@ -17,15 +17,15 @@ import (
 // renders the issue as JSON / YAML / Markdown for piping into other tools.
 //
 // Returns an error (causing a non-zero exit in main) when the id is missing,
-// malformed, or unknown — required by the `issue show` acceptance criterion.
+// malformed, or unknown — required by the `issue-cli show` acceptance criterion.
 //
-// Argument shape: `issue show <id> [--format ...]`. The id must be the first
-// positional argument so the same code path serves `issue <id>` and
-// `issue #<id>` shortcuts; flags after the id are parsed against args[1:],
-// matching the convention used by `issue edit`.
+// Argument shape: `issue-cli show <id> [--format ...]`. The id must be the first
+// positional argument so the same code path serves `issue-cli <id>` and
+// `issue-cli #<id>` shortcuts; flags after the id are parsed against args[1:],
+// matching the convention used by `issue-cli edit`.
 func Show(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: issue show <id> [--format markdown|yaml|json]")
+		return fmt.Errorf("usage: issue-cli show <id> [--format markdown|yaml|json]")
 	}
 	raw := strings.TrimPrefix(args[0], "#")
 	id, err := strconv.Atoi(raw)

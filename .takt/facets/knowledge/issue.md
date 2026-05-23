@@ -15,7 +15,7 @@ go vet ./...
 ## パッケージ構成
 
 ```
-cmd/issue/main.go          最小限のサブコマンドパーサ → internal/cli にディスパッチ
+cmd/issue-cli/main.go      最小限のサブコマンドパーサ → internal/cli にディスパッチ
 internal/model/issue.go    Issue 構造体、Status / Type enum、AdvanceStatus
 internal/store/store.go    .issues/<id>.yaml への CRUD (tempfile + Rename で原子書き込み)
 internal/gitx/gitx.go      git symbolic-ref / checkout のラッパ、issue/<id> ブランチ規約
@@ -50,7 +50,7 @@ type Issue struct {
 
 - `StatusRank` で順序を定義。`AdvanceStatus(target)` は前進のみ (rank が上がる方向)。
 - checkout 時の自動遷移 (`advanceOnCheckout`) は `AdvanceStatus` を使う — 前進のみ。
-- TUI の `s` キーや `issue edit --status` は任意方向の直接代入 — ユーザー明示操作。
+- TUI の `s` キーや `issue-cli edit --status` は任意方向の直接代入 — ユーザー明示操作。
 - `ParseStatus` は正規形のみ受理 (ストア検証用)。`ParseStatusFromCLI` は大文字小文字・エイリアス許容 (CLI 入力用)。
 
 ## ストア規約
