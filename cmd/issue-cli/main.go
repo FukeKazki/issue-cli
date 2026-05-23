@@ -34,6 +34,8 @@ func main() {
 		err = cli.Edit(args)
 	case "metadata", "meta":
 		err = cli.Metadata(args)
+	case "takt":
+		err = cli.Takt(args)
 	case "-h", "--help", "help":
 		usage()
 		return
@@ -65,6 +67,7 @@ func usage() {
   issue-cli metadata set <id> k=v [k=v ...]  merge key/value pairs into the issue's metadata map
   issue-cli metadata unset <id> k [k ...]    remove keys from the metadata map
   issue-cli metadata clear <id>              drop the entire metadata map
+  issue-cli takt [options]                   run TODO issues through a simple-takt workflow
 
 Keys in list:
   Enter   show issue detail (q/Esc to return)
