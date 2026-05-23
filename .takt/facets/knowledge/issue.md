@@ -5,7 +5,7 @@ Go モジュール `github.com/FukeKazki/issue-cli`。Bubble Tea TUI + YAML-on-d
 ## ビルド・テスト
 
 ```sh
-go build ./cmd/issue
+go build ./cmd/issue-cli
 go test ./...
 go vet ./...
 ```

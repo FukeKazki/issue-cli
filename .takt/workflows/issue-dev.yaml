@@ -57,6 +57,7 @@ steps:
     provider: claude
     persona: coder
     required_permission_mode: edit
+    session: refresh
     pass_previous_response: true
     instruction: implement-issue
     structured_output:
@@ -158,3 +159,20 @@ steps:
         appendix: |
           submit-pr-publish が失敗しました (exit_code: {context:submit-pr-publish:exit_code})
           stderr: {context:submit-pr-publish:stderr}
+
+loop_monitors:
+  - cycle: [implement, verify]
+    threshold: 3
+    judge:
+      persona: supervisor
+      instruction: |
+        implement → verify のサイクルが {cycle_count} 回繰り返されました。
+        verify の失敗内容 (stderr) と implement の変更差分を見て、
+        進捗があるか（異なるテストが通るようになった等）を判断してください。
+      rules:
+        - condition: 健全（進捗あり）
+          next: implement
+        - condition: 非生産的（同じエラーの繰り返し）
+          next: ABORT
+          appendix: |
+            implement ⇄ verify ループが {cycle_count} 回繰り返され、進捗が見られないため中断します。

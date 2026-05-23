@@ -1,14 +1,14 @@
 lockfile_version: '1'
-generated_at: '2026-05-17T01:03:17.057171+00:00'
-apm_version: 0.12.0
+generated_at: '2026-05-23T09:02:35.740653+00:00'
+apm_version: 0.14.2
 dependencies:
-- repo_url: yoshinani-dev/skills
+- repo_url: FukeKazki/simple-takt
   host: github.com
-  resolved_commit: 676a5ff794f9300e58c5a81325b89dcfc4b2f0b9
-  virtual_path: skills/submit-pr
+  resolved_commit: 329a8be13869b55cd1948bf9eac02551ea70f4b9
+  virtual_path: skills/create-workflow
   is_virtual: true
   package_type: claude_skill
   deployed_files:
-  - .agents/skills/submit-pr
-  - .claude/skills/submit-pr
-  content_hash: sha256:17056f9be95b2d534a20dc9912027b941d683778c7b6f46049ec67bc69070d89
+  - .agents/skills/create-workflow
+  - .claude/skills/create-workflow
+  content_hash: sha256:d7997767fcab20cbd238ff977f749a194fa08cd61e231e4335f5be666bd4adea
