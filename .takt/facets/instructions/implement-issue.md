@@ -1,11 +1,14 @@
 # 実装
 
-`{task}` と `plan.md` に従って、必要な変更だけを実装してください。
+以下のタスクと `plan.md` に従って、必要な変更だけを実装してください。
 Report Directory のレポートと実際のファイル内容を優先し、他のレポートディレクトリは参照しないでください。
+
+### タスク
+{task}
 
 守ること:
 
-- `{task}` の description / scope から外れる変更は避ける。必要な場合は理由を `coder-scope.md` に書く。
+- タスクの description / scope から外れる変更は避ける。必要な場合は理由を `coder-scope.md` に書く。
 - タスクに明示がない限り、新しいテストやテスト環境は増やさない。
 - `model.Issue` にフィールドを追加するときは `yaml:` タグを付ける。
 - TUI の新しい副作用は `ListAction*` を介して `cli/list.go` 側で扱う。

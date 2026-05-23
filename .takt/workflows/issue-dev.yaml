@@ -94,7 +94,10 @@ steps:
   # LLM を呼ばない。exit_code で routing。stdout/stderr は context.verify.* に残る。
   - name: verify
     kind: script
-    run: go vet ./... && go test ./...
+    run: |
+      set -euo pipefail
+      go vet ./...
+      go test ./...
     timeout_ms: 600000
     rules:
       - when: context.verify.exit_code == 0
@@ -131,12 +134,21 @@ steps:
       test -s .takt/work/commit-msg.txt
       test -s .takt/work/pr-title.txt
       test -s .takt/work/pr-body.md
+
       git add -A
-      git commit -F .takt/work/commit-msg.txt
+      if ! git diff --cached --quiet; then
+        git commit -F .takt/work/commit-msg.txt
+      fi
+
       git push -u origin HEAD
-      gh pr create \
-        --title "$(cat .takt/work/pr-title.txt)" \
-        --body-file .takt/work/pr-body.md
+
+      if gh pr view HEAD --json url >/dev/null 2>&1; then
+        echo "PR already exists for this branch"
+      else
+        gh pr create \
+          --title "$(cat .takt/work/pr-title.txt)" \
+          --body-file .takt/work/pr-body.md
+      fi
     timeout_ms: 120000
     rules:
       - when: context.submit-pr-publish.exit_code == 0
@@ -144,4 +156,5 @@ steps:
       - when: "true"
         next: ABORT
         appendix: |
-          submit-pr-publish exit_code: {context:submit-pr-publish:exit_code}
+          submit-pr-publish が失敗しました (exit_code: {context:submit-pr-publish:exit_code})
+          stderr: {context:submit-pr-publish:stderr}
