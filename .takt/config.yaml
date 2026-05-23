@@ -1,0 +1,5 @@
+language: ja
+provider: claude
+provider_profiles:
+  claude:
+    default_permission_mode: full

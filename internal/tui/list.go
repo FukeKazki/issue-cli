@@ -34,17 +34,18 @@ const (
 )
 
 type listModel struct {
-	header      string
-	issues      []model.Issue
-	filtered    []int
-	cursor      int
-	topIdx      int
-	showPreview bool
-	filtering   bool
-	filterInput textinput.Model
-	width       int
-	height      int
-	result      ListResult
+	header        string
+	issues        []model.Issue
+	filtered      []int
+	cursor        int
+	topIdx        int
+	showPreview   bool
+	filtering     bool
+	filterInput   textinput.Model
+	width         int
+	height        int
+	result        ListResult
+	previewOffset int
 }
 
 func RunList(issues []model.Issue, header string, initialID int) (ListResult, error) {
@@ -99,6 +100,7 @@ func (m *listModel) applyFilter() {
 	if m.cursor < 0 {
 		m.cursor = 0
 	}
+	m.previewOffset = 0
 }
 
 func (m listModel) Init() tea.Cmd { return nil }
@@ -154,16 +156,43 @@ func (m listModel) updateBrowsing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "j", "down":
 		if m.cursor < len(m.filtered)-1 {
 			m.cursor++
+			m.previewOffset = 0
 		}
 	case "k", "up":
 		if m.cursor > 0 {
 			m.cursor--
+			m.previewOffset = 0
 		}
 	case "g", "home":
 		m.cursor = 0
+		m.previewOffset = 0
 	case "G", "end":
 		if len(m.filtered) > 0 {
 			m.cursor = len(m.filtered) - 1
+			m.previewOffset = 0
+		}
+	case "J":
+		if iss := m.currentIssue(); iss != nil {
+			lines := strings.Split(RenderDetail(iss), "\n")
+			if len(lines) > 0 && lines[len(lines)-1] == "" {
+				lines = lines[:len(lines)-1]
+			}
+			headerLines := strings.Count(panelHeaderStyle.Render("PREVIEW")+"\n", "\n")
+			maxVisible := m.panelInnerHeight() - headerLines
+			if maxVisible < 1 {
+				maxVisible = 1
+			}
+			maxOffset := len(lines) - maxVisible
+			if maxOffset < 0 {
+				maxOffset = 0
+			}
+			if m.previewOffset < maxOffset {
+				m.previewOffset++
+			}
+		}
+	case "K":
+		if m.previewOffset > 0 {
+			m.previewOffset--
 		}
 	case "/":
 		m.filtering = true
@@ -331,13 +360,76 @@ func (m listModel) renderListPanel(w int) string {
 }
 
 func (m listModel) renderPreviewPanel(w int) string {
-	body := panelHeaderStyle.Render("PREVIEW") + "\n"
-	if iss := m.currentIssue(); iss != nil {
-		body += RenderDetail(iss)
-	} else {
-		body += hintStyle.Render("(no selection)")
+	header := panelHeaderStyle.Render("PREVIEW") + "\n"
+	headerLines := strings.Count(header, "\n")
+
+	iss := m.currentIssue()
+	if iss == nil {
+		body := header + hintStyle.Render("(no selection)")
+		return panelStyle.Width(w).Render(body)
 	}
-	return panelStyle.Width(w).Render(body)
+
+	detail := RenderDetail(iss)
+	lines := strings.Split(detail, "\n")
+	// Remove trailing empty line from Split if detail ends with "\n"
+	if len(lines) > 0 && lines[len(lines)-1] == "" {
+		lines = lines[:len(lines)-1]
+	}
+
+	maxVisible := m.panelInnerHeight() - headerLines
+	if maxVisible < 1 {
+		maxVisible = 1
+	}
+
+	totalLines := len(lines)
+	offset := m.previewOffset
+
+	// Clamp offset
+	maxOffset := totalLines - maxVisible
+	if maxOffset < 0 {
+		maxOffset = 0
+	}
+	if offset > maxOffset {
+		offset = maxOffset
+	}
+
+	hasAbove := offset > 0
+	hasBelow := offset+maxVisible < totalLines
+
+	// Reserve lines for indicators
+	contentLines := maxVisible
+	if hasAbove {
+		contentLines--
+	}
+	if hasBelow {
+		contentLines--
+	}
+	if contentLines < 1 {
+		contentLines = 1
+	}
+
+	end := offset + contentLines
+	if end > totalLines {
+		end = totalLines
+	}
+
+	var b strings.Builder
+	b.WriteString(header)
+
+	if hasAbove {
+		b.WriteString(hintStyle.Render("▲") + "\n")
+	}
+
+	for i := offset; i < end; i++ {
+		b.WriteString(lines[i])
+		b.WriteString("\n")
+	}
+
+	if hasBelow {
+		b.WriteString(hintStyle.Render("▼"))
+	}
+
+	return panelStyle.Width(w).Render(b.String())
 }
 
 // truncateDisplay は表示幅 max を超える文字列を末尾 "..." 付きで切り詰める。
@@ -369,6 +461,9 @@ func (m listModel) renderFooter() string {
 		"v preview",
 		"/ filter",
 		"q quit",
+	}
+	if m.showPreview && m.width >= listMinWidthForPreview {
+		keys = append(keys[:len(keys)-1], "J/K scroll", keys[len(keys)-1])
 	}
 	return footerStyle.Render(strings.Join(keys, "  ·  "))
 }

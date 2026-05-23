@@ -1,0 +1,19 @@
+{
+  "type": "object",
+  "properties": {
+    "completed": {
+      "type": "boolean",
+      "description": "実装が完了したか"
+    },
+    "blocked": {
+      "type": "boolean",
+      "description": "進行を妨げる問題があり継続不能か"
+    },
+    "needs_user_input": {
+      "type": "boolean",
+      "description": "ユーザー入力が必要で再ループしたいか"
+    }
+  },
+  "required": ["completed", "blocked", "needs_user_input"],
+  "additionalProperties": false
+}

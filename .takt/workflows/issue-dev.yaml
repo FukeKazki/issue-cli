@@ -1,0 +1,147 @@
+name: issue-dev
+description: Issue を計画・実装・検証し、PR を作成する
+
+# 判定の住み分け:
+#   AI 判定が必要      → plan / implement / submit-pr-compose (routing は structured_output)
+#   完全 deterministic → verify / submit-pr-publish (kind: script + exit_code)
+
+instructions:
+  implement-issue: ../facets/instructions/implement-issue.md
+  submit-pr-issue: ../facets/instructions/submit-pr-issue.md
+
+schemas:
+  plan-decision: plan-decision
+  implement-status: implement-status
+  pr-publish: pr-publish
+
+max_steps: 12
+initial_step: plan
+
+steps:
+  # ─── 1. 計画 (AI) ─────────────────────────────────────────────
+  # LLM に "次に進む action" を enum で答えさせる。routing は文字列比較のみ。
+  - name: plan
+    edit: false
+    provider: claude
+    persona: planner
+    knowledge: ../facets/knowledge/issue.md
+    instruction: |
+      Issue の内容を読み、実装方針を短くまとめる。
+      scope が空でも、既存コードと要件から安全に判断できる場合は確認で止めずに計画する。
+    structured_output:
+      schema_ref: plan-decision
+    output_contracts:
+      report:
+        - name: plan.md
+          format: |
+            # タスク計画
+            - 目的
+            - 実装方針
+            - 変更対象
+            - 検証方針
+    rules:
+      - when: structured.plan.action == "implement"
+        next: implement
+      - when: structured.plan.action == "not_a_task"
+        next: COMPLETE
+      - when: structured.plan.action == "needs_confirmation"
+        next: ABORT
+        appendix: |
+          確認事項:
+          {structured:plan:questions}
+
+  # ─── 2. 実装 (AI) ─────────────────────────────────────────────
+  # 完了フラグを bool で返させる。「文中に文字列があるか」を AI に判定させない。
+  - name: implement
+    edit: true
+    provider: claude
+    persona: coder
+    required_permission_mode: edit
+    pass_previous_response: true
+    instruction: implement-issue
+    structured_output:
+      schema_ref: implement-status
+    output_contracts:
+      report:
+        - name: coder-scope.md
+          format: |
+            # 変更スコープ宣言
+
+            ## タスク
+            {タスクの要約}
+
+            ## 変更したファイル
+            - `{ファイルパス}`
+
+            ## 影響範囲
+            - {影響範囲}
+
+            ## 実施した確認
+            - {確認内容}
+    rules:
+      - when: structured.implement.completed == true && structured.implement.blocked == false
+        next: verify
+      - when: structured.implement.blocked == true
+        next: ABORT
+      - when: structured.implement.needs_user_input == true
+        next: implement
+        requires_user_input: true
+        interactive_only: true
+      - when: "true"
+        next: implement
+
+  # ─── 3. 検証 (script, deterministic) ──────────────────────────
+  # LLM を呼ばない。exit_code で routing。stdout/stderr は context.verify.* に残る。
+  - name: verify
+    kind: script
+    run: go vet ./... && go test ./...
+    timeout_ms: 600000
+    rules:
+      - when: context.verify.exit_code == 0
+        next: submit-pr-compose
+      - when: "true"
+        next: implement
+
+  # ─── 4. PR 文面の作成 (AI) ────────────────────────────────────
+  # AI は commit message / PR title / PR body をファイルに書くだけ。
+  # 実際の git/gh 操作は次の script step で deterministic に走る。
+  - name: submit-pr-compose
+    edit: true
+    provider: claude
+    persona: coder
+    required_permission_mode: edit
+    pass_previous_response: true
+    instruction: submit-pr-issue
+    structured_output:
+      schema_ref: pr-publish
+    rules:
+      - when: structured.submit-pr-compose.files_ready == true
+        next: submit-pr-publish
+      - when: "true"
+        next: ABORT
+        appendix: |
+          PR 文面の生成に失敗
+
+  # ─── 5. PR の提出 (script, deterministic) ────────────────────
+  # commit / push / gh pr create を 1 トランザクションで実行。
+  - name: submit-pr-publish
+    kind: script
+    run: |
+      set -euo pipefail
+      test -s .takt/work/commit-msg.txt
+      test -s .takt/work/pr-title.txt
+      test -s .takt/work/pr-body.md
+      git add -A
+      git commit -F .takt/work/commit-msg.txt
+      git push -u origin HEAD
+      gh pr create \
+        --title "$(cat .takt/work/pr-title.txt)" \
+        --body-file .takt/work/pr-body.md
+    timeout_ms: 120000
+    rules:
+      - when: context.submit-pr-publish.exit_code == 0
+        next: COMPLETE
+      - when: "true"
+        next: ABORT
+        appendix: |
+          submit-pr-publish exit_code: {context:submit-pr-publish:exit_code}

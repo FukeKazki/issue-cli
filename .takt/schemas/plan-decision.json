@@ -1,0 +1,16 @@
+{
+  "type": "object",
+  "properties": {
+    "action": {
+      "type": "string",
+      "enum": ["implement", "not_a_task", "needs_confirmation"],
+      "description": "実装に進む / 実装タスクではない / 要件確認が必要"
+    },
+    "questions": {
+      "type": "string",
+      "description": "action == needs_confirmation のときだけ使う質問の箇条書き"
+    }
+  },
+  "required": ["action"],
+  "additionalProperties": false
+}

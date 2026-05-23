@@ -11,7 +11,3 @@
 
 # APM dependencies
 apm_modules/
-
-# .takt
-.takt/
-scripts/
