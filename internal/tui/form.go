@@ -36,6 +36,7 @@ const (
 	focusRefs
 	focusScope
 	focusBlockedBy
+	focusParent
 	focusCount
 )
 
@@ -93,6 +94,7 @@ type formModel struct {
 	refsArea              textarea.Model
 	scopeArea             textarea.Model
 	blockedByArea         textarea.Model
+	parentInput           textinput.Model
 	statuses              []model.Status
 	statusIdx             int
 	types                 []model.Type
@@ -108,6 +110,8 @@ type formModel struct {
 	candidates            []IssueCandidate
 	blockedByCompletion   completionState
 	blockedByCandidates   []IssueCandidate
+	parentCompletion      completionState
+	parentCandidates      []IssueCandidate
 	confirmOnCancel       bool
 	awaitingCancelConfirm bool
 }
@@ -162,6 +166,16 @@ func newFormModel(iss *model.Issue, header string, candidates []IssueCandidate) 
 	blockedBy.CharLimit = 0
 	blockedBy.Blur()
 
+	parentIn := textinput.New()
+	parentIn.Placeholder = "parent issue id"
+	parentIn.Prompt = "▏ "
+	parentIn.CharLimit = 20
+	parentIn.Width = defaultFormWidth - 6
+	if iss.Parent != nil {
+		parentIn.SetValue(strconv.Itoa(*iss.Parent))
+	}
+	parentIn.Blur()
+
 	statuses := model.AllStatuses()
 	idx := 0
 	if iss.Status != "" {
@@ -194,6 +208,7 @@ func newFormModel(iss *model.Issue, header string, candidates []IssueCandidate) 
 		refsArea:      refs,
 		scopeArea:     scope,
 		blockedByArea: blockedBy,
+		parentInput:   parentIn,
 		statuses:      statuses,
 		statusIdx:     idx,
 		types:         types,
@@ -222,6 +237,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.refsArea.SetWidth(fw)
 		m.scopeArea.SetWidth(fw)
 		m.blockedByArea.SetWidth(fw)
+		m.parentInput.Width = fw - 2
 		fitDescHeight(&m.descArea)
 		return m, nil
 
@@ -286,6 +302,29 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 		}
+		if m.focus == focusParent && m.parentCompletion.active {
+			switch msg.String() {
+			case "esc":
+				m.parentCompletion.active = false
+				return m, nil
+			case "up", "ctrl+p":
+				if n := len(m.parentCompletion.items); n > 0 {
+					m.parentCompletion.idx = (m.parentCompletion.idx - 1 + n) % n
+				}
+				return m, nil
+			case "down", "ctrl+n":
+				if n := len(m.parentCompletion.items); n > 0 {
+					m.parentCompletion.idx = (m.parentCompletion.idx + 1) % n
+				}
+				return m, nil
+			case "tab", "enter":
+				if len(m.parentCompletion.items) > 0 {
+					m.applyParentCompletion()
+				}
+				m.parentCompletion.active = false
+				return m, nil
+			}
+		}
 		switch msg.String() {
 		case "ctrl+c":
 			m.canceled = true
@@ -319,6 +358,30 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					return m, nil
 				}
 			}
+			parentStr := strings.TrimSpace(m.parentInput.Value())
+			if parentStr != "" {
+				pStr := strings.TrimPrefix(parentStr, "#")
+				pStr = strings.TrimSpace(pStr)
+				n, err := strconv.Atoi(pStr)
+				if err != nil {
+					m.errMsg = fmt.Sprintf("parent: %q is not a valid issue id", parentStr)
+					m.focus = focusParent
+					m.applyFocus()
+					return m, nil
+				}
+				if n <= 0 {
+					m.errMsg = "parent: id must be positive"
+					m.focus = focusParent
+					m.applyFocus()
+					return m, nil
+				}
+				if n == m.iss.ID {
+					m.errMsg = "parent cannot reference self"
+					m.focus = focusParent
+					m.applyFocus()
+					return m, nil
+				}
+			}
 			m.submitted = true
 			return m, tea.Quit
 		case "tab":
@@ -330,7 +393,7 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.applyFocus()
 			return m, nil
 		case "enter":
-			if m.focus == focusTitle || m.focus == focusStatus || m.focus == focusType {
+			if m.focus == focusTitle || m.focus == focusStatus || m.focus == focusType || m.focus == focusParent {
 				m.focus = (m.focus + 1) % focusCount
 				m.applyFocus()
 				return m, nil
@@ -373,6 +436,9 @@ func (m formModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case focusBlockedBy:
 		m.blockedByArea, cmd = m.blockedByArea.Update(msg)
 		m.recomputeBlockedByCompletion()
+	case focusParent:
+		m.parentInput, cmd = m.parentInput.Update(msg)
+		m.recomputeParentCompletion()
 	}
 	return m, cmd
 }
@@ -437,6 +503,13 @@ func (m *formModel) applyFocus() {
 		m.blockedByArea.Blur()
 		m.blockedByCompletion.active = false
 	}
+	if m.focus == focusParent {
+		m.parentInput.Focus()
+		m.recomputeParentCompletion()
+	} else {
+		m.parentInput.Blur()
+		m.parentCompletion.active = false
+	}
 }
 
 func (m formModel) View() string {
@@ -472,6 +545,13 @@ func (m formModel) isDirty() bool {
 		return true
 	}
 	if strings.TrimRight(m.blockedByArea.Value(), "\n") != joinIssueIDs(m.iss.BlockedBy) {
+		return true
+	}
+	origParent := ""
+	if m.iss.Parent != nil {
+		origParent = strconv.Itoa(*m.iss.Parent)
+	}
+	if strings.TrimSpace(m.parentInput.Value()) != origParent {
 		return true
 	}
 	return false
@@ -565,6 +645,17 @@ func (m formModel) renderFormPanel() string {
 	if m.focus == focusBlockedBy && m.blockedByCompletion.active {
 		b.WriteString("\n")
 		b.WriteString(m.renderBlockedByCompletion())
+	}
+	b.WriteString("\n\n")
+
+	b.WriteString(m.fieldLabel("PARENT", focusParent))
+	b.WriteString("  ")
+	b.WriteString(hintStyle.Render("issue id; type to search"))
+	b.WriteString("\n")
+	b.WriteString(m.parentInput.View())
+	if m.focus == focusParent && m.parentCompletion.active {
+		b.WriteString("\n")
+		b.WriteString(m.renderParentCompletion())
 	}
 
 	if m.errMsg != "" {
@@ -660,6 +751,16 @@ func RunForm(iss *model.Issue, header string, confirmOnCancel bool, candidates [
 	// blockedByArea was validated by the ctrl+s handler before submission.
 	ids, _ := parseIssueIDs(fm.blockedByArea.Value())
 	iss.BlockedBy = ids
+	// parent was validated by the ctrl+s handler before submission.
+	parentStr := strings.TrimSpace(fm.parentInput.Value())
+	if parentStr != "" {
+		pStr := strings.TrimPrefix(parentStr, "#")
+		pStr = strings.TrimSpace(pStr)
+		n, _ := strconv.Atoi(pStr)
+		iss.Parent = &n
+	} else {
+		iss.Parent = nil
+	}
 	return nil
 }
 
@@ -1010,6 +1111,65 @@ func (m *formModel) applyBlockedByCompletion() {
 		m.blockedByArea, _ = m.blockedByArea.Update(tea.KeyMsg{Type: tea.KeyBackspace})
 	}
 	m.blockedByArea.InsertString(strconv.Itoa(sel.ID))
+}
+
+func (m *formModel) recomputeParentCompletion() {
+	query := strings.TrimSpace(m.parentInput.Value())
+	if query == "" {
+		m.parentCompletion.active = false
+		return
+	}
+	query = strings.TrimPrefix(query, "#")
+	cands := filterIssueCandidates(m.candidates, query, m.iss.ID)
+	display := make([]string, len(cands))
+	for i, c := range cands {
+		display[i] = fmt.Sprintf("#%d  %s", c.ID, c.Title)
+	}
+	prevActive := m.parentCompletion.active
+	m.parentCompletion.active = true
+	m.parentCompletion.items = display
+	m.parentCandidates = cands
+	if !prevActive || m.parentCompletion.idx >= len(display) {
+		m.parentCompletion.idx = 0
+	}
+}
+
+func (m *formModel) applyParentCompletion() {
+	if m.parentCompletion.idx < 0 || m.parentCompletion.idx >= len(m.parentCandidates) {
+		return
+	}
+	sel := m.parentCandidates[m.parentCompletion.idx]
+	m.parentInput.SetValue(strconv.Itoa(sel.ID))
+	m.parentInput.CursorEnd()
+}
+
+func (m formModel) renderParentCompletion() string {
+	items := m.parentCompletion.items
+	box := lipgloss.NewStyle().
+		Border(lipgloss.NormalBorder()).
+		BorderForeground(colMuted).
+		Padding(0, 1)
+	if len(items) == 0 {
+		return box.Render(hintStyle.Render("no issues match"))
+	}
+	start, end := windowAround(m.parentCompletion.idx, len(items), completionMaxItems)
+	var lines []string
+	for i := start; i < end; i++ {
+		marker := "  "
+		text := items[i]
+		if i == m.parentCompletion.idx {
+			marker = labelFocus.Render("▸ ")
+			text = labelFocus.Render(text)
+		} else {
+			text = labelBlur.Render(text)
+		}
+		lines = append(lines, marker+text)
+	}
+	if end < len(items) {
+		lines = append(lines, hintStyle.Render(fmt.Sprintf("  +%d more", len(items)-end)))
+	}
+	lines = append(lines, hintStyle.Render("↑/↓ select • tab/enter insert • esc dismiss"))
+	return box.Render(strings.Join(lines, "\n"))
 }
 
 func (m formModel) renderBlockedByCompletion() string {

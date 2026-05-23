@@ -186,5 +186,24 @@ func validate(iss *model.Issue) error {
 			return fmt.Errorf("issue #%d cannot block itself", iss.ID)
 		}
 	}
+	if iss.Parent != nil {
+		if *iss.Parent <= 0 {
+			return fmt.Errorf("parent must be positive (got %d)", *iss.Parent)
+		}
+		if *iss.Parent == iss.ID {
+			return fmt.Errorf("issue #%d cannot be its own parent", iss.ID)
+		}
+	}
 	return nil
+}
+
+// ChildrenOf returns issues from the given slice whose Parent equals id.
+func ChildrenOf(id int, issues []model.Issue) []model.Issue {
+	var out []model.Issue
+	for i := range issues {
+		if issues[i].Parent != nil && *issues[i].Parent == id {
+			out = append(out, issues[i])
+		}
+	}
+	return out
 }

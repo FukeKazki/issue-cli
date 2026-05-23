@@ -131,7 +131,11 @@ func showIssue(s *store.Store, id int) error {
 	if err != nil {
 		return err
 	}
-	return tui.RunDetailView(iss)
+	parent, children, err := resolveRelatives(iss, s)
+	if err != nil {
+		return err
+	}
+	return tui.RunDetailView(iss, parent, children)
 }
 
 func editIssue(s *store.Store, id int) error {
@@ -227,6 +231,26 @@ func newFromList(s *store.Store) (int, error) {
 		return 0, err
 	}
 	return id, nil
+}
+
+// resolveRelatives loads all issues and returns the parent (if any) and
+// children for the given issue. Used by CLI callers that need to pass
+// parent/children to RenderDetail / RunDetailView.
+func resolveRelatives(iss *model.Issue, s *store.Store) (parent *model.Issue, children []model.Issue, err error) {
+	all, err := s.LoadAll()
+	if err != nil {
+		return nil, nil, err
+	}
+	if iss.Parent != nil {
+		for i := range all {
+			if all[i].ID == *iss.Parent {
+				parent = &all[i]
+				break
+			}
+		}
+	}
+	children = store.ChildrenOf(iss.ID, all)
+	return
 }
 
 // loadIssueCandidates reads all issues from the store and returns the

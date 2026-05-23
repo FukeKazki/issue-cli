@@ -20,7 +20,7 @@ var (
 	}
 )
 
-func RenderDetail(iss *model.Issue) string {
+func RenderDetail(iss *model.Issue, parent *model.Issue, children []model.Issue) string {
 	var b strings.Builder
 
 	fmt.Fprintln(&b, titleStyle.Render(fmt.Sprintf("#%d  %s", iss.ID, iss.Title)))
@@ -72,6 +72,24 @@ func RenderDetail(iss *model.Issue) string {
 	} else {
 		for _, id := range iss.BlockedBy {
 			fmt.Fprintf(&b, "  - #%d\n", id)
+		}
+	}
+	fmt.Fprintln(&b)
+
+	fmt.Fprintln(&b, labelStyle.Render("Parent:"))
+	if parent != nil {
+		fmt.Fprintf(&b, "  #%d  %s\n", parent.ID, parent.Title)
+	} else {
+		fmt.Fprintln(&b, "  (none)")
+	}
+	fmt.Fprintln(&b)
+
+	fmt.Fprintln(&b, labelStyle.Render("Children:"))
+	if len(children) == 0 {
+		fmt.Fprintln(&b, "  (none)")
+	} else {
+		for _, c := range children {
+			fmt.Fprintf(&b, "  - #%d  %s\n", c.ID, c.Title)
 		}
 	}
 	fmt.Fprintln(&b)

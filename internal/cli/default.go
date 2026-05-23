@@ -26,6 +26,10 @@ func Default() error {
 	if err != nil {
 		return fmt.Errorf("load issue #%d: %v", id, err)
 	}
-	fmt.Print(tui.RenderDetail(iss))
+	parent, children, err := resolveRelatives(iss, s)
+	if err != nil {
+		return err
+	}
+	fmt.Print(tui.RenderDetail(iss, parent, children))
 	return nil
 }
