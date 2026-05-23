@@ -3,7 +3,13 @@ version: 1.0.0
 description: APM project for issue-cli
 author: FukeKazki
 dependencies:
-  apm: []
+  apm: [
+    "FukeKazki/simple-takt/skills/create-workflow"
+]
   mcp: []
 includes: auto
 scripts: {}
+targets:
+  - claude
+  - cursor
+  - copilot
