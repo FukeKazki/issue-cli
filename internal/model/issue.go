@@ -67,16 +67,17 @@ func StatusRank(s Status) int {
 type Type string
 
 const (
-	TypeBug      Type = "Bug"
-	TypeFeature  Type = "Feature"
-	TypeDocs     Type = "Docs"
-	TypeRefactor Type = "Refactor"
+	TypeBug         Type = "Bug"
+	TypeFeature     Type = "Feature"
+	TypeEnhancement Type = "Enhancement"
+	TypeDocs        Type = "Docs"
+	TypeRefactor    Type = "Refactor"
 )
 
 // AllTypes returns the canonical Type values in display order. Order matches
 // the form picker and the issue body's enumeration.
 func AllTypes() []Type {
-	return []Type{TypeBug, TypeFeature, TypeDocs, TypeRefactor}
+	return []Type{TypeBug, TypeFeature, TypeEnhancement, TypeDocs, TypeRefactor}
 }
 
 // ParseType is the canonical-strict string→Type parser. It accepts only the
