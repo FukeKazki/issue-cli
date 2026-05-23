@@ -3,18 +3,16 @@
 ローカル完結型の Issue マネージャ。Issue をリポジトリ内の `.issues/` 配下に
 YAML として保存し、組み込みの TUI で閲覧し、id で Git ブランチを切り替えます。
 
-リポジトリ名は `issue-cli` ですが、インストールされるバイナリ名は `issue` です。
-
 ## インストール
 
 ```sh
-go install github.com/FukeKazki/issue-cli/cmd/issue@latest
+go install github.com/FukeKazki/issue-cli/cmd/issue-cli@latest
 ```
 
 または mise 経由:
 
 ```sh
-mise use -g go:github.com/FukeKazki/issue-cli/cmd/issue@latest
+mise use -g go:github.com/FukeKazki/issue-cli/cmd/issue-cli@latest
 ```
 
 `PATH` 上に `git` が必要です。
@@ -22,25 +20,25 @@ mise use -g go:github.com/FukeKazki/issue-cli/cmd/issue@latest
 ## 使い方
 
 ```
-issue                                  # 現在の issue/<id> ブランチに対応する issue を表示。それ以外では一覧 TUI を開く
-issue show <id> [--format markdown|yaml|json]
-issue list [--all] [--status=STATUS] [--format json]
-issue next [--format json]             # 自動化向け。次に着手すべき TODO issue を返す
-issue new [--title TITLE]
-issue edit <id> --status STATUS        # CLI から issue のステータスを更新（大文字小文字を区別しない）
-issue metadata <id>                    # issue に紐づく自由形式のメタデータを表示
-issue metadata set <id> k=v [k=v ...]  # キー/値ペアを issue のメタデータマップにマージ
-issue metadata unset <id> k [k ...]    # 指定したキーを削除
-issue metadata clear <id>              # メタデータマップを丸ごと削除
+issue-cli                                  # 現在の issue/<id> ブランチに対応する issue を表示。それ以外では一覧 TUI を開く
+issue-cli show <id> [--format markdown|yaml|json]
+issue-cli list [--all] [--status=STATUS] [--format json]
+issue-cli next [--format json]             # 自動化向け。次に着手すべき TODO issue を返す
+issue-cli new [--title TITLE]
+issue-cli edit <id> --status STATUS        # CLI から issue のステータスを更新（大文字小文字を区別しない）
+issue-cli metadata <id>                    # issue に紐づく自由形式のメタデータを表示
+issue-cli metadata set <id> k=v [k=v ...]  # キー/値ペアを issue のメタデータマップにマージ
+issue-cli metadata unset <id> k [k ...]    # 指定したキーを削除
+issue-cli metadata clear <id>              # メタデータマップを丸ごと削除
 ```
 
-### `issue`（引数なし）
+### `issue-cli`（引数なし）
 
 現在の Git ブランチが `issue/<id>` にマッチする場合、対応する issue の詳細
 （タイトル、ステータス、説明、参照、スコープ、タイムスタンプ）を表示します。
-それ以外のブランチでは、一覧 TUI を開きます（`issue list` と同じ）。
+それ以外のブランチでは、一覧 TUI を開きます（`issue-cli list` と同じ）。
 
-### `issue list`
+### `issue-cli list`
 
 オープンな issue（TODO / In Progress / Reviews）を表示する組み込み TUI を開
 きます。左ペインが一覧、右ペインが詳細プレビューです。
@@ -66,22 +64,22 @@ issue metadata clear <id>              # メタデータマップを丸ごと削
 フィルタ: `--all` で Done も含める、`--status="In Progress"` で 1 つのステー
 タスに絞り込み。
 
-### `issue new`
+### `issue-cli new`
 
 引数なしの場合 → TUI フォームを開く（タイトル / ステータス / 参照 / スコープ）。
 `--title "..."` 付きの場合 → そのタイトルでステータス `TODO`、参照・スコープ
 なしの issue を作成。
 
-### `issue edit`
+### `issue-cli edit`
 
 非インタラクティブなステータス更新です。変更はどの方向にも許可されます
 （前方向のみの自動遷移ルールは `c` checkout のようなイベント駆動の自動遷移
 にのみ適用されます）。
 
 ```sh
-issue edit 13 --status DONE
-issue edit #13 --status done
-issue edit 13 --status in-progress
+issue-cli edit 13 --status DONE
+issue-cli edit #13 --status done
+issue-cli edit 13 --status in-progress
 ```
 
 `--status` に指定できる値（大文字小文字を区別しない）:
@@ -96,18 +94,18 @@ issue edit 13 --status in-progress
 `--status` は必須です。未知の値を渡すと、YAML には触れずに非ゼロで終了しま
 す。
 
-### `issue metadata`
+### `issue-cli metadata`
 
 issue に対する自由形式のキー/値属性です。CLI はキーや値を解釈しません。自動
 化ランナー、スクリプト、人間が、必要な任意のコンテキスト（workflow id、
 run id、PR url、計測値など）を CLI 側のスキーマ固定に縛られずに付与できます。
 
 ```sh
-issue metadata 13                                                    # 表示
-issue metadata set 13 workflow=issue-dev run-id=20260520-abc         # マージ
-issue metadata set 13 result=success pr-url=https://github.com/.../42
-issue metadata unset 13 error                                        # キーを削除
-issue metadata clear 13                                              # すべて削除
+issue-cli metadata 13                                                    # 表示
+issue-cli metadata set 13 workflow=issue-dev run-id=20260520-abc         # マージ
+issue-cli metadata set 13 result=success pr-url=https://github.com/.../42
+issue-cli metadata unset 13 error                                        # キーを削除
+issue-cli metadata clear 13                                              # すべて削除
 ```
 
 `set` は既存マップへマージします（同じキーの値は上書き）。`unset` は指定し
@@ -126,18 +124,18 @@ issue metadata clear 13                                              # すべて
 
 | コマンド                                         | 出力                                                                            |
 | ------------------------------------------------ | ------------------------------------------------------------------------------- |
-| `issue show <id> --format markdown\|yaml\|json`  | issue を 1 件出力。id が無い／不明なら非ゼロで終了                              |
-| `issue list --format json [--status STATUS]`     | issue の JSON 配列（`--all` / `--status` フィルタ適用後）                       |
-| `issue next [--format json]`                     | エンベロープ `{"issue": {...}}`。TODO が残っていない場合は `{"issue": null}`   |
-| `issue metadata <subcmd> <id> ... --format json` | 更新後の issue（mutation 適用後）を 1 件の JSON オブジェクトとして出力          |
+| `issue-cli show <id> --format markdown\|yaml\|json`  | issue を 1 件出力。id が無い／不明なら非ゼロで終了                              |
+| `issue-cli list --format json [--status STATUS]`     | issue の JSON 配列（`--all` / `--status` フィルタ適用後）                       |
+| `issue-cli next [--format json]`                     | エンベロープ `{"issue": {...}}`。TODO が残っていない場合は `{"issue": null}`   |
+| `issue-cli metadata <subcmd> <id> ... --format json` | 更新後の issue（mutation 適用後）を 1 件の JSON オブジェクトとして出力          |
 
-`issue next` は最小 id の `TODO` issue を選びます（決定的）。常に 0 で終了
+`issue-cli next` は最小 id の `TODO` issue を選びます（決定的）。常に 0 で終了
 するので、下流のパイプは常に有効な JSON を受け取れます。
 
 simple-takt にパイプする例:
 
 ```sh
-issue next --format json | simple-takt -w issue-dev
+issue-cli next --format json | simple-takt -w issue-dev
 ```
 
 ## ストレージ
@@ -165,13 +163,13 @@ created_at: 2026-05-16T10:30:00+09:00
 updated_at: 2026-05-16T10:30:00+09:00
 ```
 
-TUI フォーム（`issue new` または一覧での `e`）には **BLOCKED BY** フィール
+TUI フォーム（`issue-cli new` または一覧での `e`）には **BLOCKED BY** フィール
 ドがあります。1 行につき issue id を 1 つ入力します。入力中は既存 issue の
 オートコンプリートポップアップが表示されます（id の前方一致またはタイトル
 の部分一致でフィルタされます）。`tab` / `enter` で選択した id を挿入できま
 す。自己参照および 0 以下の id は保存時に拒否されます。
 
-メタデータが無い issue は `metadata:` ブロックを書き出しません。`issue
+メタデータが無い issue は `metadata:` ブロックを書き出しません。`issue-cli
 metadata set` が遅延書き込みし、`unset` で最後のキーが消えた時点で再び落と
 されます。
 
@@ -184,7 +182,7 @@ ID は `max(existing)+1` で採番されます。`.issues/` を git にコミッ
 ## Claude Code スキル
 
 `skills/issue-cli/SKILL.md` は Claude Code 用のスキルで、エージェントに非イ
-ンタラクティブな文脈からこの CLI を扱う方法（`issue new --title` をいつ呼ぶ
+ンタラクティブな文脈からこの CLI を扱う方法（`issue-cli new --title` をいつ呼ぶ
 か、`.issues/<id>.yaml` を直接読むのはどんなときか、ブランチ命名規約など）
 を教えます。
 

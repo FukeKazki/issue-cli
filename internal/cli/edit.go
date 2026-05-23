@@ -16,7 +16,7 @@ import (
 // (forward or backward), mirroring the TUI `s` key path in changeStatus.
 func Edit(args []string) error {
 	if len(args) < 1 {
-		return fmt.Errorf("usage: issue edit <id> --status STATUS")
+		return fmt.Errorf("usage: issue-cli edit <id> --status STATUS")
 	}
 	raw := strings.TrimPrefix(args[0], "#")
 	id, err := strconv.Atoi(raw)

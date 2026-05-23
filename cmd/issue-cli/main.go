@@ -54,17 +54,17 @@ func main() {
 
 func usage() {
 	fmt.Fprint(os.Stderr, `Usage:
-  issue                                  on issue/<id>: show that issue; otherwise: open list TUI
-  issue <id> | issue #<id>               show issue detail
-  issue show <id> [--format markdown|yaml|json]
-  issue list [--all] [--status=STATUS] [--format json]
-  issue next [--format json]             print the next TODO issue as JSON ({"issue": null} if none)
-  issue new [--title TITLE]
-  issue edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
-  issue metadata <id>                    show free-form metadata attached to an issue
-  issue metadata set <id> k=v [k=v ...]  merge key/value pairs into the issue's metadata map
-  issue metadata unset <id> k [k ...]    remove keys from the metadata map
-  issue metadata clear <id>              drop the entire metadata map
+  issue-cli                                  on issue/<id>: show that issue; otherwise: open list TUI
+  issue-cli <id> | issue-cli #<id>           show issue detail
+  issue-cli show <id> [--format markdown|yaml|json]
+  issue-cli list [--all] [--status=STATUS] [--format json]
+  issue-cli next [--format json]             print the next TODO issue as JSON ({"issue": null} if none)
+  issue-cli new [--title TITLE]
+  issue-cli edit <id> --status STATUS        update status (case-insensitive; accepts TODO/done/in-progress/review etc.)
+  issue-cli metadata <id>                    show free-form metadata attached to an issue
+  issue-cli metadata set <id> k=v [k=v ...]  merge key/value pairs into the issue's metadata map
+  issue-cli metadata unset <id> k [k ...]    remove keys from the metadata map
+  issue-cli metadata clear <id>              drop the entire metadata map
 
 Keys in list:
   Enter   show issue detail (q/Esc to return)

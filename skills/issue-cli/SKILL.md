@@ -9,24 +9,24 @@ description: ローカルIssueをissue-cliで管理する。タスクをIssue化
 
 ## 使用判断
 
-- ユーザが「Issueに残しておいて」「タスク化」「TODOを記録」など永続化を求めたとき → `issue new --title "..."`
-- ユーザが「いまどのIssueをやっている?」「現在のIssue」と聞いたとき、または `issue/<id>` ブランチ上にいるとき → `issue` (引数なし) または `issue show <id>`
-- 特定IDの中身を確認するとき → `issue show <id>` か `.issues/<id>.yaml` をRead
-- 一覧・ステータス更新・削除はTUI主体。非対話で扱う場合は `issue list --format json` / `issue next --format json` か `.issues/*.yaml` を直接走査・編集する
+- ユーザが「Issueに残しておいて」「タスク化」「TODOを記録」など永続化を求めたとき → `issue-cli new --title "..."`
+- ユーザが「いまどのIssueをやっている?」「現在のIssue」と聞いたとき、または `issue/<id>` ブランチ上にいるとき → `issue-cli` (引数なし) または `issue-cli show <id>`
+- 特定IDの中身を確認するとき → `issue-cli show <id>` か `.issues/<id>.yaml` をRead
+- 一覧・ステータス更新・削除はTUI主体。非対話で扱う場合は `issue-cli list --format json` / `issue-cli next --format json` か `.issues/*.yaml` を直接走査・編集する
 
 ## 使えるコマンド (非対話)
 
 ```sh
-issue new --title "<タイトル>"                     # status=TODO で新規作成 (IDは max(existing)+1 を採番)
-issue show <id>                                    # 詳細をプレーンテキストで標準出力にプリント
-issue show <id> --format markdown|yaml|json        # 機械可読フォーマットで1件出力 (存在しないIDは非ゼロ終了)
-issue list --format json [--status STATUS] [--all] # 一覧をJSON配列で出力 (フィルタ済み)
-issue next --format json                           # 最小IDのTODO Issueを {"issue": ...} で返す (なければ {"issue": null}, 常に exit 0)
-issue edit <id> --status <STATUS>                  # ステータスを更新 (大文字小文字不問。done/in-progress/review なども可)
-issue                                              # issue/<id> ブランチ上なら詳細を表示、それ以外はTUI起動
+issue-cli new --title "<タイトル>"                     # status=TODO で新規作成 (IDは max(existing)+1 を採番)
+issue-cli show <id>                                    # 詳細をプレーンテキストで標準出力にプリント
+issue-cli show <id> --format markdown|yaml|json        # 機械可読フォーマットで1件出力 (存在しないIDは非ゼロ終了)
+issue-cli list --format json [--status STATUS] [--all] # 一覧をJSON配列で出力 (フィルタ済み)
+issue-cli next --format json                           # 最小IDのTODO Issueを {"issue": ...} で返す (なければ {"issue": null}, 常に exit 0)
+issue-cli edit <id> --status <STATUS>                  # ステータスを更新 (大文字小文字不問。done/in-progress/review なども可)
+issue-cli                                              # issue/<id> ブランチ上なら詳細を表示、それ以外はTUI起動
 ```
 
-`issue list` (フォーマット指定なし) や引数なしの `issue new` は対話TUIを起動するため、Claudeからは呼ばない。simple-takt 等のランナーへ流すときは `issue next --format json | simple-takt -w issue-dev` のように `--format json` を使う。
+`issue-cli list` (フォーマット指定なし) や引数なしの `issue-cli new` は対話TUIを起動するため、Claudeからは呼ばない。simple-takt 等のランナーへ流すときは `issue-cli next --format json | simple-takt -w issue-dev` のように `--format json` を使う。
 
 ## 保存形式
 
@@ -72,4 +72,4 @@ for f in .issues/*.yaml; do
 done
 ```
 
-ステータス変更は `issue edit <id> --status <STATUS>` (非対話) もしくは TUI の `s` キーで行える。複数件を一括で書き換える場合は対象YAMLの `status:` 行 (および `updated_at:`) を直接編集するのが早い。
+ステータス変更は `issue-cli edit <id> --status <STATUS>` (非対話) もしくは TUI の `s` キーで行える。複数件を一括で書き換える場合は対象YAMLの `status:` 行 (および `updated_at:`) を直接編集するのが早い。

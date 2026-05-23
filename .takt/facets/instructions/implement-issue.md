@@ -11,7 +11,7 @@ Report Directory のレポートと実際のファイル内容を優先し、他
 - TUI の新しい副作用は `ListAction*` を介して `cli/list.go` 側で扱う。
 
 検証は次の `verify` ステップが `go vet ./... && go test ./...` を実行します。
-実装中は必要に応じて部分テストや `go build ./cmd/issue` だけ実行してください。
+実装中は必要に応じて部分テストや `go build ./cmd/issue-cli` だけ実行してください。
 
 ## 完了判定 (structured_output)
 
