@@ -1,0 +1,40 @@
+name: develop
+description: 実装ワークフロー
+max_steps: 10
+initial_step: implement
+
+steps:
+  - name: implement
+    edit: true
+    instruction: implement
+    session: refresh
+    required_permission_mode: full
+    rules:
+      - when: "true"
+        next: create-pr
+
+  - name: create-pr
+    edit: false
+    required_permission_mode: full
+    instruction: |
+      現在のブランチの変更内容をもとに GitHub Pull Request を作成してください。
+
+      **やること:**
+      1. `git log main..HEAD --oneline` でコミット一覧を確認する
+      2. `git diff main...HEAD --stat` で変更ファイルの概要を把握する
+      3. コミットメッセージと差分から PR タイトルと本文を作成する
+      4. `gh pr create` で PR を作成する
+
+      **PR 本文のフォーマット:**
+      ```markdown
+      ## Summary
+      - {変更内容の要点を箇条書き}
+      ```
+
+      **注意:**
+      - PR タイトルは 70 文字以内
+      - ブランチが remote に push されていない場合は `git push -u origin HEAD` を先に実行する
+      - main ブランチ上で作業している場合は、適切なブランチ名で新しいブランチを作成してから PR を作成する
+    rules:
+      - when: "true"
+        next: COMPLETE
