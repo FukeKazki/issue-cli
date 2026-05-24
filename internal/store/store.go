@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FukeKazki/issue-cli/internal/config"
 	"github.com/FukeKazki/issue-cli/internal/model"
 	"gopkg.in/yaml.v3"
 )
@@ -63,7 +64,7 @@ func (s *Store) LoadAll() ([]model.Issue, error) {
 	}
 	var issues []model.Issue
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") {
+		if e.IsDir() || !strings.HasSuffix(e.Name(), ".yaml") || e.Name() == config.FileName {
 			continue
 		}
 		p := filepath.Join(s.Dir, e.Name())

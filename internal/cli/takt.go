@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/FukeKazki/issue-cli/internal/config"
 	"github.com/FukeKazki/issue-cli/internal/model"
 	"github.com/FukeKazki/issue-cli/internal/output"
 	"github.com/FukeKazki/issue-cli/internal/store"
@@ -18,7 +19,7 @@ import (
 
 func Takt(args []string) error {
 	fs := flag.NewFlagSet("takt", flag.ContinueOnError)
-	workflow := fs.String("workflow", "issue-dev", "simple-takt workflow name")
+	workflow := fs.String("workflow", "", "simple-takt workflow name (or set takt.workflow in .issues/config.yaml)")
 	limit := fs.Int("limit", 1, "maximum number of issues to run")
 	untilEmpty := fs.Bool("until-empty", false, "keep selecting TODO issues until none remain")
 	issueFlag := fs.Int("issue", 0, "run one specific issue instead of selecting from TODO")
@@ -26,15 +27,22 @@ func Takt(args []string) error {
 	dryRun := fs.Bool("dry-run", false, "print issues that would run without mutating metadata")
 	continueOnError := fs.Bool("continue-on-error", false, "record failed runs and continue with next issue")
 	useWorktree := fs.Bool("worktree", false, "run each issue in an isolated git worktree")
-	worktreeDir := fs.String("worktree-dir", "../issue-worktrees", "base directory for worktrees")
+	worktreeDir := fs.String("worktree-dir", "", "base directory for worktrees (or set takt.worktree-dir in .issues/config.yaml)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 
 	limitSet := false
+	workflowSet := false
+	worktreeDirSet := false
 	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "limit" {
+		switch f.Name {
+		case "limit":
 			limitSet = true
+		case "workflow":
+			workflowSet = true
+		case "worktree-dir":
+			worktreeDirSet = true
 		}
 	})
 
@@ -48,6 +56,26 @@ func Takt(args []string) error {
 		return fmt.Errorf("--task-format must be one of: markdown, json, yaml")
 	}
 
+	repoRoot := taktRepoRoot()
+	cfg, err := config.Load(filepath.Join(repoRoot, store.DirName))
+	if err != nil {
+		return err
+	}
+	if !workflowSet && cfg.Takt.Workflow != "" {
+		*workflow = cfg.Takt.Workflow
+	}
+	if !worktreeDirSet && cfg.Takt.WorktreeDir != "" {
+		*worktreeDir = cfg.Takt.WorktreeDir
+	}
+	if *workflow == "" {
+		return fmt.Errorf("--workflow is required (set via flag or takt.workflow in .issues/config.yaml)")
+	}
+
+	const defaultWorktreeDir = "../issue-worktrees"
+	if *worktreeDir == "" {
+		*worktreeDir = defaultWorktreeDir
+	}
+
 	taktBin := os.Getenv("SIMPLE_TAKT_BIN")
 	if taktBin == "" {
 		taktBin = "simple-takt"
@@ -57,8 +85,6 @@ func Takt(args []string) error {
 			return fmt.Errorf("required command not found: %s", taktBin)
 		}
 	}
-
-	repoRoot := taktRepoRoot()
 
 	logDir := os.Getenv("ISSUE_TAKT_LOG_DIR")
 	if logDir == "" {
