@@ -42,8 +42,12 @@ const (
 
 const (
 	defaultFormWidth = 56
-	textareaHeight   = 4
-	descAreaHeight   = 6
+	// minFormWidth is the narrowest the form panel shrinks to on small
+	// terminals. Below this the inner textareas (which clamp to 20 columns)
+	// no longer fit, so there is no point shrinking further.
+	minFormWidth   = 24
+	textareaHeight = 4
+	descAreaHeight = 6
 )
 
 var (
@@ -574,13 +578,96 @@ func (m formModel) formColWidth() int {
 		return defaultFormWidth
 	}
 	w := m.width - 2
-	if w < defaultFormWidth {
+	// Cap at defaultFormWidth on wide terminals so fields keep a comfortable
+	// reading width, and let the panel shrink (down to minFormWidth) on narrow
+	// terminals so it never spills past the right edge of the screen.
+	if w > defaultFormWidth {
 		w = defaultFormWidth
+	}
+	if w < minFormWidth {
+		w = minFormWidth
 	}
 	return w
 }
 
+// renderFormPanel draws the form, scrolling its content vertically so the
+// currently focused field stays visible when the terminal is too short to show
+// every field at once.
 func (m formModel) renderFormPanel() string {
+	content, ranges := m.buildFormBody()
+	w := m.formColWidth()
+	if m.height <= 0 {
+		return panelStyle.Width(w).Render(content)
+	}
+
+	lines := strings.Split(content, "\n")
+	// availH = terminal height minus the footer (1) and panel border (2).
+	availH := m.height - 3
+	if availH < 3 {
+		availH = 3
+	}
+	if len(lines) <= availH {
+		return panelStyle.Width(w).Render(content)
+	}
+
+	fs, fe := 0, 0
+	if r, ok := ranges[m.focus]; ok {
+		fs, fe = r[0], r[1]
+	}
+	start, end, above, below := formScrollWindow(len(lines), availH, fs, fe)
+
+	var b strings.Builder
+	if above {
+		b.WriteString(hintStyle.Render("▲ more"))
+		b.WriteString("\n")
+	}
+	b.WriteString(strings.Join(lines[start:end], "\n"))
+	if below {
+		b.WriteString("\n")
+		b.WriteString(hintStyle.Render("▼ more"))
+	}
+	return panelStyle.Width(w).Render(b.String())
+}
+
+// formScrollWindow computes which slice [start,end) of `total` content lines to
+// show in a viewport `availH` rows tall, guaranteeing the focused field's line
+// range [fs,fe] stays visible. It reserves one row each for the ▲/▼ indicators
+// when there is hidden content above/below, reported via `above`/`below`.
+func formScrollWindow(total, availH, fs, fe int) (start, end int, above, below bool) {
+	if availH < 1 {
+		availH = 1
+	}
+	if total <= availH {
+		return 0, total, false, false
+	}
+	visible := availH - 2 // reserve rows for the ▲ and ▼ indicators
+	if visible < 1 {
+		visible = 1
+	}
+	offset := 0
+	if fe >= visible {
+		offset = fe - visible + 1
+	}
+	if fs < offset {
+		offset = fs
+	}
+	if maxOffset := total - visible; offset > maxOffset {
+		offset = maxOffset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	end = offset + visible
+	if end > total {
+		end = total
+	}
+	return offset, end, offset > 0, end < total
+}
+
+// buildFormBody renders the full (unscrolled) form content and returns it
+// together with the [start,end] line range each focusable field occupies, so
+// renderFormPanel can scroll the focused field into view.
+func (m formModel) buildFormBody() (string, map[int][2]int) {
 	header := m.header
 	if header == "" {
 		header = "Issue"
@@ -590,42 +677,60 @@ func (m formModel) renderFormPanel() string {
 	}
 
 	var b strings.Builder
+	ranges := make(map[int][2]int)
+	// line reports the index of the next line to be written (= count of
+	// newlines already in the buffer). ANSI styling contains no newlines, so
+	// this stays accurate across styled output.
+	line := func() int { return strings.Count(b.String(), "\n") }
+	mark := func(focus, start int) { ranges[focus] = [2]int{start, line()} }
+
 	b.WriteString(panelHeaderStyle.Render(header))
 	b.WriteString("\n")
 
+	s := line()
 	b.WriteString(m.fieldLabel("TITLE", focusTitle))
 	b.WriteString("\n")
 	b.WriteString(m.titleInput.View())
+	mark(focusTitle, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("STATUS", focusStatus))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("←/→ change"))
 	b.WriteString("\n")
 	b.WriteString(m.renderStatusRow())
+	mark(focusStatus, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("TYPE", focusType))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("←/→ change"))
 	b.WriteString("\n")
 	b.WriteString(m.renderTypeRow())
+	mark(focusType, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("DESCRIPTION", focusDescription))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("multi-line"))
 	b.WriteString("\n")
 	b.WriteString(m.descArea.View())
+	mark(focusDescription, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("REFERENCES", focusRefs))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("one per line"))
 	b.WriteString("\n")
 	b.WriteString(m.refsArea.View())
+	mark(focusRefs, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("SCOPE", focusScope))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("type @ to search files; one path per line"))
@@ -635,8 +740,10 @@ func (m formModel) renderFormPanel() string {
 		b.WriteString("\n")
 		b.WriteString(m.renderScopeCompletion())
 	}
+	mark(focusScope, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("BLOCKED BY", focusBlockedBy))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("one issue id per line; type to search"))
@@ -646,8 +753,10 @@ func (m formModel) renderFormPanel() string {
 		b.WriteString("\n")
 		b.WriteString(m.renderBlockedByCompletion())
 	}
+	mark(focusBlockedBy, s)
 	b.WriteString("\n\n")
 
+	s = line()
 	b.WriteString(m.fieldLabel("PARENT", focusParent))
 	b.WriteString("  ")
 	b.WriteString(hintStyle.Render("issue id; type to search"))
@@ -657,13 +766,14 @@ func (m formModel) renderFormPanel() string {
 		b.WriteString("\n")
 		b.WriteString(m.renderParentCompletion())
 	}
+	mark(focusParent, s)
 
 	if m.errMsg != "" {
 		b.WriteString("\n\n")
 		b.WriteString(errorStyle.Render("✗ " + m.errMsg))
 	}
 
-	return panelStyle.Width(m.formColWidth()).Render(b.String())
+	return b.String(), ranges
 }
 
 func (m formModel) fieldLabel(label string, target int) string {
@@ -727,7 +837,13 @@ func (m formModel) renderFooter() string {
 		"ctrl+s save",
 		"esc cancel",
 	}
-	return footerStyle.Render(strings.Join(keys, "  •  "))
+	line := strings.Join(keys, "  •  ")
+	// Keep the footer to a single line so it never wraps and steals a row from
+	// the form panel on narrow terminals.
+	if m.width > 0 && runewidth.StringWidth(line) > m.width {
+		line = truncateDisplay(line, m.width)
+	}
+	return footerStyle.Render(line)
 }
 
 func RunForm(iss *model.Issue, header string, confirmOnCancel bool, candidates []IssueCandidate) error {
