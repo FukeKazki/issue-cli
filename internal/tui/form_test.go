@@ -390,10 +390,63 @@ func TestFilterIssueCandidates(t *testing.T) {
 	})
 }
 
+func TestFormColWidth(t *testing.T) {
+	tests := []struct {
+		name  string
+		width int
+		want  int
+	}{
+		{"unsized falls back to default", 0, defaultFormWidth},
+		{"wide terminal capped at default", 200, defaultFormWidth},
+		{"just above default capped", 58, defaultFormWidth},
+		{"medium terminal shrinks", 40, 38},
+		{"narrow terminal shrinks", 30, 28},
+		{"tiny terminal floored at minimum", 20, minFormWidth},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			m := formModel{width: tc.width}
+			if got := m.formColWidth(); got != tc.want {
+				t.Errorf("formColWidth(width=%d) = %d, want %d", tc.width, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestFormScrollWindow(t *testing.T) {
+	tests := []struct {
+		name                  string
+		total, availH, fs, fe int
+		wantStart, wantEnd    int
+		wantAbove, wantBelow  bool
+	}{
+		{"everything fits", 5, 10, 0, 4, 0, 5, false, false},
+		{"fits exactly", 10, 10, 0, 9, 0, 10, false, false},
+		{"focus at top scrolls down only", 20, 10, 0, 2, 0, 8, false, true},
+		{"focus at bottom scrolls up only", 20, 10, 18, 19, 12, 20, true, false},
+		{"focus in middle scrolls both", 30, 10, 14, 16, 9, 17, true, true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			start, end, above, below := formScrollWindow(tc.total, tc.availH, tc.fs, tc.fe)
+			if start != tc.wantStart || end != tc.wantEnd || above != tc.wantAbove || below != tc.wantBelow {
+				t.Errorf("formScrollWindow(%d,%d,%d,%d) = (%d,%d,%v,%v), want (%d,%d,%v,%v)",
+					tc.total, tc.availH, tc.fs, tc.fe,
+					start, end, above, below,
+					tc.wantStart, tc.wantEnd, tc.wantAbove, tc.wantBelow)
+			}
+			// The focused field must always stay within the visible window.
+			if tc.fs < start || tc.fe >= end {
+				t.Errorf("focused range [%d,%d] not visible in window [%d,%d)", tc.fs, tc.fe, start, end)
+			}
+		})
+	}
+}
+
 func TestWindowAround(t *testing.T) {
 	tests := []struct {
-		name              string
-		idx, total, size  int
+		name               string
+		idx, total, size   int
 		wantStart, wantEnd int
 	}{
 		{"fits within size", 0, 5, 8, 0, 5},

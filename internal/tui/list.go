@@ -247,16 +247,29 @@ func (m listModel) currentIssue() *model.Issue {
 	return &iss
 }
 
-func (m listModel) View() string {
-	listW := m.width
-	previewW := 0
-	if m.showPreview && m.width >= listMinWidthForPreview {
-		previewW = m.width * listPreviewPct / 100
-		listW = m.width - previewW - 1
+// listColumns splits the terminal width into the list panel width and the
+// preview panel width. The preview is only shown when enabled and the terminal
+// is at least listMinWidthForPreview wide. The list width is floored at 30 for
+// readability but never allowed to exceed the terminal width, so a narrow
+// terminal shrinks the panel instead of overflowing past the right edge.
+func listColumns(width int, showPreview bool) (listW, previewW int) {
+	listW = width
+	if showPreview && width >= listMinWidthForPreview {
+		previewW = width * listPreviewPct / 100
+		listW = width - previewW - 1
 	}
 	if listW < 30 {
 		listW = 30
 	}
+	if width > 0 && listW > width {
+		listW = width
+		previewW = 0
+	}
+	return listW, previewW
+}
+
+func (m listModel) View() string {
+	listW, previewW := listColumns(m.width, m.showPreview)
 
 	listPanel := m.renderListPanel(listW)
 	if previewW > 0 {
@@ -487,5 +500,14 @@ func (m listModel) renderFooter() string {
 	if m.showPreview && m.width >= listMinWidthForPreview {
 		keys = append(keys[:len(keys)-1], "J/K scroll", keys[len(keys)-1])
 	}
-	return footerStyle.Render(strings.Join(keys, "  ·  "))
+	line := strings.Join(keys, "  ·  ")
+	// On a terminal too narrow to hold every key hint, fall back to a compact
+	// set so the footer stays a single line instead of wrapping.
+	if m.width > 0 && runewidth.StringWidth(line) > m.width {
+		line = strings.Join([]string{"j/k move", "enter show", "n new", "/ filter", "q quit"}, "  ·  ")
+		if runewidth.StringWidth(line) > m.width {
+			line = truncateDisplay(line, m.width)
+		}
+	}
+	return footerStyle.Render(line)
 }
